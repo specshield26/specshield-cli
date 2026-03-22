@@ -1,0 +1,17 @@
+# SpecShield configuration file
+# CLI arguments always override these values
+
+allowBreakingChanges: false
+failOnBreaking: true
+
+ignore:
+  # Add change strings to ignore (matched as substrings)
+  # - "User.email removed"
+  # - "/users DELETE removed"
+
+severity: error   # info | warning | error
+
+remote:
+  enabled: false
+  url: "http://localhost:8081/api/compare/raw"
+  timeout: 10000

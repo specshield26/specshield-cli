@@ -1,0 +1,176 @@
+'use strict';
+
+const { Command } = require('commander');
+const chalk = require('chalk');
+const ora = require('ora');
+const path = require('path');
+const { loadSpec } = require('../core/loadSpec');
+const { parseSpec } = require('../core/parseSpec');
+const { normalizeSpec } = require('../core/normalizeSpec');
+const { diffSpecs } = require('../core/diffEngine');
+const { classifyChanges } = require('../core/classifyChanges');
+const { formatHuman, formatJson } = require('../core/outputFormatter');
+const { loadConfig } = require('../core/configLoader');
+const { resolveExitCode } = require('../core/exitCode');
+const logger = require('../utils/logger');
+const fsExtra = require('fs-extra');
+
+const compare = new Command('compare');
+
+compare
+  .description('Compare two OpenAPI spec files and detect breaking changes')
+  .argument('<base>', 'Path to the base (old) OpenAPI spec')
+  .argument('<target>', 'Path to the target (new) OpenAPI spec')
+  .option('--json', 'Output machine-readable JSON')
+  .option('--output <file>', 'Save result to a file')
+  .option('--fail-on-breaking', 'Exit with code 1 if breaking changes are found')
+  .option('--allow-breaking', 'Override fail-on-breaking behavior')
+  .option('--config <path>', 'Path to .specshield.yml config file')
+  .option('--ignore <change>', 'Ignore a specific change string (repeatable)', collect, [])
+  .option('--severity <level>', 'Minimum severity level: info | warning | error', 'error')
+  .option('--remote-url <url>', 'Remote API endpoint for comparison')
+  .option('--timeout <ms>', 'Request timeout for remote mode (ms)', '10000')
+  .action(async (base, target, opts) => {
+    try {
+      // Load config
+      const config = await loadConfig(opts.config);
+
+      // Merge config with CLI options (CLI wins)
+      const options = mergeOptions(config, opts);
+
+      const spinner = options.json ? null : ora('Loading specs...').start();
+
+      let result;
+
+      if (options.remoteUrl || (config.remote && config.remote.enabled)) {
+        result = await runRemoteComparison(base, target, options, spinner);
+      } else {
+        result = await runLocalComparison(base, target, options, spinner);
+      }
+
+      if (spinner) spinner.stop();
+
+      // Apply ignore list
+      result = applyIgnoreList(result, options.ignore || []);
+
+      // Output
+      if (options.json) {
+        const jsonOutput = formatJson(result);
+        process.stdout.write(JSON.stringify(jsonOutput, null, 2) + '\n');
+        if (options.output) {
+          await fsExtra.outputFile(options.output, JSON.stringify(jsonOutput, null, 2));
+        }
+      } else {
+        const humanOutput = formatHuman(result);
+        process.stdout.write(humanOutput + '\n');
+        if (options.output) {
+          const jsonOutput = formatJson(result);
+          await fsExtra.outputFile(options.output, JSON.stringify(jsonOutput, null, 2));
+          logger.info(`Results saved to ${options.output}`);
+        }
+      }
+
+      // Exit code
+      const code = resolveExitCode(result, options);
+      process.exit(code);
+
+    } catch (err) {
+      logger.error(`Error: ${err.message}`);
+      process.exit(2);
+    }
+  });
+
+async function runLocalComparison(base, target, options, spinner) {
+  if (spinner) spinner.text = 'Loading base spec...';
+  const baseRaw = await loadSpec(base);
+
+  if (spinner) spinner.text = 'Loading target spec...';
+  const targetRaw = await loadSpec(target);
+
+  if (spinner) spinner.text = 'Parsing specs...';
+  const baseParsed = parseSpec(baseRaw, base);
+  const targetParsed = parseSpec(targetRaw, target);
+
+  if (spinner) spinner.text = 'Normalizing specs...';
+  const baseNorm = normalizeSpec(baseParsed);
+  const targetNorm = normalizeSpec(targetParsed);
+
+  if (spinner) spinner.text = 'Comparing specs...';
+  const rawDiffs = diffSpecs(baseNorm, targetNorm);
+
+  if (spinner) spinner.text = 'Classifying changes...';
+  return classifyChanges(rawDiffs);
+}
+
+async function runRemoteComparison(base, target, options, spinner) {
+  const axios = require('axios');
+  const { loadSpec } = require('../core/loadSpec');
+
+  if (spinner) spinner.text = 'Loading specs for remote comparison...';
+  const baseRaw = await loadSpec(base);
+  const targetRaw = await loadSpec(target);
+
+  const url = options.remoteUrl || (options.remote && options.remote.url);
+  const timeout = parseInt(options.timeout, 10) || 10000;
+
+  if (spinner) spinner.text = `Sending to remote: ${url}`;
+
+  try {
+    const response = await axios.post(
+      url,
+      { baseSpec: baseRaw, targetSpec: targetRaw },
+      { timeout, headers: { 'Content-Type': 'application/json' } }
+    );
+    return response.data;
+  } catch (err) {
+    const msg = err.response
+      ? `Remote API error ${err.response.status}: ${JSON.stringify(err.response.data)}`
+      : `Remote connection failed: ${err.message}`;
+    throw new Error(msg);
+  }
+}
+
+function applyIgnoreList(result, ignoreList) {
+  if (!ignoreList || ignoreList.length === 0) return result;
+
+  const shouldIgnore = (change) => {
+    const desc = change.description || change.message || '';
+    return ignoreList.some((pattern) => desc.includes(pattern));
+  };
+
+  return {
+    ...result,
+    breakingChanges: result.breakingChanges.filter((c) => !shouldIgnore(c)),
+    additions: result.additions.filter((c) => !shouldIgnore(c)),
+    modifications: result.modifications.filter((c) => !shouldIgnore(c)),
+    warnings: result.warnings.filter((c) => !shouldIgnore(c)),
+  };
+}
+
+function mergeOptions(config, cliOpts) {
+  return {
+    json: cliOpts.json || false,
+    output: cliOpts.output || null,
+    failOnBreaking: cliOpts.allowBreaking
+      ? false
+      : cliOpts.failOnBreaking !== undefined
+      ? cliOpts.failOnBreaking
+      : config.failOnBreaking !== undefined
+      ? config.failOnBreaking
+      : false,
+    allowBreaking: cliOpts.allowBreaking || config.allowBreakingChanges || false,
+    ignore: [
+      ...(cliOpts.ignore || []),
+      ...(config.ignore || []),
+    ],
+    severity: cliOpts.severity || config.severity || 'error',
+    remoteUrl: cliOpts.remoteUrl || (config.remote && config.remote.enabled ? config.remote.url : null),
+    timeout: cliOpts.timeout || (config.remote && config.remote.timeout) || 10000,
+  };
+}
+
+function collect(value, previous) {
+  return previous.concat([value]);
+}
+
+module.exports = compare;
