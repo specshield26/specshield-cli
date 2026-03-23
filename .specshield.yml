@@ -13,5 +13,5 @@ severity: error   # info | warning | error
 
 remote:
   enabled: false
-  url: "http://localhost:8081/api/compare/raw"
+  url: ~
   timeout: 10000

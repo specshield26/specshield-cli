@@ -8,7 +8,7 @@ const { loadSpec } = require('../core/loadSpec');
 const { parseSpec } = require('../core/parseSpec');
 const { normalizeSpec } = require('../core/normalizeSpec');
 const { diffSpecs } = require('../core/diffEngine');
-const { classifyChanges } = require('../core/classifyChanges');
+const { classifyChanges, filterBySeverity } = require('../core/classifyChanges');
 const { formatHuman, formatJson } = require('../core/outputFormatter');
 const { loadConfig } = require('../core/configLoader');
 const { resolveExitCode } = require('../core/exitCode');
@@ -52,6 +52,9 @@ compare
 
       // Apply ignore list
       result = applyIgnoreList(result, options.ignore || []);
+
+      // Apply severity filter
+      result = filterBySeverity(result, options.severity);
 
       // Output
       if (options.json) {

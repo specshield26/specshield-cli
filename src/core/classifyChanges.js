@@ -42,6 +42,9 @@ const WARNING_TYPES = new Set([
   // future use
 ]);
 
+// Numeric order: higher = more severe
+const SEVERITY_ORDER = { error: 2, warning: 1, info: 0 };
+
 function classifyChanges(diffs) {
   const result = {
     breakingChanges: [],
@@ -62,15 +65,20 @@ function classifyChanges(diffs) {
     };
 
     if (BREAKING_TYPES.has(diff.type)) {
+      change.severity = 'error';
       result.breakingChanges.push(change);
     } else if (ADDITION_TYPES.has(diff.type)) {
+      change.severity = 'info';
       result.additions.push(change);
     } else if (MODIFICATION_TYPES.has(diff.type)) {
+      change.severity = 'warning';
       result.modifications.push(change);
     } else if (WARNING_TYPES.has(diff.type)) {
+      change.severity = 'warning';
       result.warnings.push(change);
     } else {
       // Unknown type — treat as modification
+      change.severity = 'warning';
       result.modifications.push(change);
     }
   }
@@ -78,4 +86,19 @@ function classifyChanges(diffs) {
   return result;
 }
 
-module.exports = { classifyChanges };
+/**
+ * Filter a classified result to only include changes at or above minSeverity.
+ * info < warning < error
+ */
+function filterBySeverity(result, minSeverity) {
+  const minLevel = SEVERITY_ORDER[minSeverity] ?? 0;
+  const passes = (c) => (SEVERITY_ORDER[c.severity] ?? 0) >= minLevel;
+  return {
+    breakingChanges: result.breakingChanges.filter(passes),
+    additions: result.additions.filter(passes),
+    modifications: result.modifications.filter(passes),
+    warnings: result.warnings.filter(passes),
+  };
+}
+
+module.exports = { classifyChanges, filterBySeverity };

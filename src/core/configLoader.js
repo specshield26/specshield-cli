@@ -11,7 +11,7 @@ const DEFAULT_CONFIG = {
   allowBreakingChanges: false,
   failOnBreaking: false,
   ignore: [],
-  severity: 'error',
+  severity: 'info',
   remote: {
     enabled: false,
     url: null,

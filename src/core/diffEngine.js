@@ -283,6 +283,38 @@ function diffSchemaNode(path, method, fieldPrefix, base, target, diffs, isReques
       });
     }
   }
+
+  // Diff array items
+  if (base.items || target.items) {
+    const itemsField = `${fieldPrefix}[items]`;
+    if (base.items && target.items) {
+      const baseItemType = schemaTypeStr(base.items);
+      const targetItemType = schemaTypeStr(target.items);
+      if (baseItemType !== targetItemType) {
+        diffs.push({
+          type: isRequest ? 'REQUEST_FIELD_TYPE_CHANGED' : 'RESPONSE_FIELD_TYPE_CHANGED',
+          path,
+          method,
+          field: itemsField,
+          oldValue: baseItemType,
+          newValue: targetItemType,
+          description: `Array item type of "${fieldPrefix}" changed from "${baseItemType}" to "${targetItemType}" in ${method.toUpperCase()} ${path}`,
+        });
+      }
+      // Recurse into items if they contain object properties
+      if (base.items.properties || target.items.properties) {
+        diffSchemaNode(path, method, itemsField, base.items, target.items, diffs, isRequest);
+      }
+    } else if (base.items && !target.items) {
+      diffs.push({
+        type: isRequest ? 'REQUEST_FIELD_REMOVED' : 'RESPONSE_FIELD_REMOVED',
+        path,
+        method,
+        field: itemsField,
+        description: `Array items schema was removed from "${fieldPrefix}" in ${method.toUpperCase()} ${path}`,
+      });
+    }
+  }
 }
 
 function diffEnums(path, method, fieldPrefix, baseEnum, targetEnum, diffs) {
