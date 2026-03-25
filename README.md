@@ -152,3 +152,7 @@ specshield compare fixtures/spec-v1.yaml fixtures/spec-v2.yaml --fail-on-breakin
 ```bash
 npm test
 ```
+
+## License
+
+MIT © Deepak Satyam

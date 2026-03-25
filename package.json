@@ -14,7 +14,7 @@
   },
   "keywords": ["openapi", "api", "breaking-changes", "cli", "specshield"],
   "license": "MIT",
-  "files": ["bin", "src", "README.md"],
+  "files": ["bin", "src", "README.md", "LICENSE"],
   "dependencies": {
     "axios": "^1.6.7",
     "chalk": "^4.1.2",
