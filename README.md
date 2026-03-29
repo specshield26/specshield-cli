@@ -1,16 +1,66 @@
-# SpecShield CLI
+# 🚀 SpecShield — OpenAPI Diff & Breaking Change Detection CLI
 
-> Compare OpenAPI specs and detect breaking changes — designed for CI/CD and local developer workflows.
+![npm](https://img.shields.io/npm/v/specshield)
+![downloads](https://img.shields.io/npm/dw/specshield)
+![license](https://img.shields.io/badge/license-MIT-blue)
+![node](https://img.shields.io/badge/node-%3E%3D18-green)
 
-## Features
+Compare OpenAPI and Swagger specs, detect breaking changes, and fail CI before incompatible API changes reach production.
 
-- Detect breaking changes, additions, and modifications between two OpenAPI specs
-- Support YAML and JSON specs
-- CI/CD-ready with exit code control (`--fail-on-breaking`)
-- Config file support (`.specshield.yml`)
-- JSON output for machine parsing
-- Ignore list to suppress known changes
-- Placeholder remote mode for future SaaS backend integration
+
+## 📌 What is SpecShield?
+
+SpecShield is a CLI tool that compares two OpenAPI/Swagger specifications and detects:
+
+- ❌ Breaking changes
+- ➕ Additions
+- 🔄 Modifications
+
+It is designed for:
+- CI/CD pipelines
+- Backend developers
+- API governance teams
+- Local development workflows
+
+---
+
+## ❗ Why SpecShield?
+
+API changes can silently break:
+- Mobile apps
+- Frontend clients
+- Partner integrations
+- Internal microservices
+
+Manual API review is:
+- ❌ Error-prone
+- ❌ Time-consuming
+- ❌ Not scalable
+
+👉 SpecShield solves this by automating API contract validation.
+
+---
+
+## 🎯 Key Benefits
+
+- 🚫 Prevent breaking API releases
+- ⚙️ Enforce API contract checks in CI/CD
+- 🔍 Compare OpenAPI specs automatically
+- 📊 Generate machine-readable reports
+- 🧩 Integrate easily with existing workflows
+- 🛑 Fail builds when breaking changes are detected
+
+---
+
+## ✨ Features
+
+- Detect breaking changes, additions, and modifications
+- Support YAML and JSON OpenAPI specs
+- CI/CD-ready with exit codes
+- JSON output for automation
+- `.specshield.yml` config support
+- Ignore list for known changes
+- Future SaaS-ready remote mode
 
 ## Installation
 

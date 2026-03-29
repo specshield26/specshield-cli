@@ -1,7 +1,7 @@
 {
   "name": "specshield",
-  "version": "1.0.0",
-  "description": "CLI tool to compare OpenAPI specs and detect breaking changes",
+  "version": "1.0.1",
+  "description": "CLI to compare OpenAPI/Swagger specs and detect breaking changes for CI/CD pipelines and local developer workflows.",
   "main": "src/cli.js",
   "bin": {
     "specshield": "./bin/specshield.js"
@@ -12,7 +12,30 @@
     "test:watch": "jest --watch",
     "lint": "eslint src tests --ext .js"
   },
-  "keywords": ["openapi", "api", "breaking-changes", "cli", "specshield"],
+  "keywords": [
+    "openapi",
+    "swagger",
+    "openapi-diff",
+    "swagger-diff",
+    "api-diff",
+    "api-breaking-changes",
+    "breaking-change-detection",
+    "contract-testing",
+    "api-contract",
+    "api-versioning",
+    "api-governance",
+    "ci-cd",
+    "devops",
+    "github-actions",
+    "automation",
+    "cli",
+    "developer-tools",
+    "yaml",
+    "json",
+    "schema-diff",
+    "rest-api",
+    "openapi-cli"
+  ],
   "license": "MIT",
   "files": ["bin", "src", "README.md", "LICENSE"],
   "dependencies": {
