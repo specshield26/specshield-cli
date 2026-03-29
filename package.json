@@ -1,6 +1,6 @@
 {
   "name": "specshield",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "CLI to compare OpenAPI/Swagger specs and detect breaking changes for CI/CD pipelines and local developer workflows.",
   "main": "src/cli.js",
   "bin": {
@@ -37,7 +37,12 @@
     "openapi-cli"
   ],
   "license": "MIT",
-  "files": ["bin", "src", "README.md", "LICENSE"],
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "axios": "^1.6.7",
     "chalk": "^4.1.2",
@@ -51,8 +56,12 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/tests/**/*.test.js"],
-    "collectCoverageFrom": ["src/**/*.js"]
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ]
   },
   "engines": {
     "node": ">=20.0.0"
