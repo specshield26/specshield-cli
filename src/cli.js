@@ -3,6 +3,8 @@
 const { Command } = require('commander');
 const { version } = require('../package.json');
 const compareCommand = require('./commands/compare');
+const loginCommand = require('./commands/login');
+const logoutCommand = require('./commands/logout');
 
 const program = new Command();
 
@@ -12,6 +14,8 @@ program
   .version(version);
 
 program.addCommand(compareCommand);
+program.addCommand(loginCommand);
+program.addCommand(logoutCommand);
 
 program.parseAsync(process.argv).catch((err) => {
   const logger = require('./utils/logger');

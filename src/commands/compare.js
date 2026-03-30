@@ -14,6 +14,9 @@ const { loadConfig } = require('../core/configLoader');
 const { resolveExitCode } = require('../core/exitCode');
 const logger = require('../utils/logger');
 const fsExtra = require('fs-extra');
+const { getStoredApiKey } = require('../config/localConfig');
+
+const HOSTED_API_URL = 'https://api.specshield.io';
 
 const compare = new Command('compare');
 
@@ -28,7 +31,9 @@ compare
   .option('--config <path>', 'Path to .specshield.yml config file')
   .option('--ignore <change>', 'Ignore a specific change string (repeatable)', collect, [])
   .option('--severity <level>', 'Minimum severity level: info | warning | error', 'error')
-  .option('--remote-url <url>', 'Remote API endpoint for comparison')
+  .option('--remote', 'Use the SpecShield hosted compare API')
+  .option('--api-key <key>', 'API key for hosted mode (overrides env and stored config)')
+  .option('--remote-url <url>', 'Override the hosted API base URL')
   .option('--timeout <ms>', 'Request timeout for remote mode (ms)', '10000')
   .action(async (base, target, opts) => {
     try {
@@ -38,11 +43,25 @@ compare
       // Merge config with CLI options (CLI wins)
       const options = mergeOptions(config, opts);
 
+      // Resolve API key for remote mode (precedence: --api-key > env > stored config > .specshield.yml)
+      if (options.remote || options.remoteUrl || (config.remote && config.remote.enabled)) {
+        options.resolvedApiKey = opts.apiKey
+          || process.env.SPECSHIELD_API_KEY
+          || await getStoredApiKey()
+          || (config.remote && config.remote.apiKey)
+          || null;
+
+        if (!options.resolvedApiKey) {
+          logger.error('No API key found. Run: specshield login --api-key <KEY>');
+          process.exit(2);
+        }
+      }
+
       const spinner = options.json ? null : ora('Loading specs...').start();
 
       let result;
 
-      if (options.remoteUrl || (config.remote && config.remote.enabled)) {
+      if (options.remote || options.remoteUrl || (config.remote && config.remote.enabled)) {
         result = await runRemoteComparison(base, target, options, spinner);
       } else {
         result = await runLocalComparison(base, target, options, spinner);
@@ -107,22 +126,29 @@ async function runLocalComparison(base, target, options, spinner) {
 
 async function runRemoteComparison(base, target, options, spinner) {
   const axios = require('axios');
-  const { loadSpec } = require('../core/loadSpec');
+  const { version } = require('../../package.json');
 
   if (spinner) spinner.text = 'Loading specs for remote comparison...';
   const baseRaw = await loadSpec(base);
   const targetRaw = await loadSpec(target);
 
-  const url = options.remoteUrl || (options.remote && options.remote.url);
+  const url = options.remoteUrl || HOSTED_API_URL + '/compare';
   const timeout = parseInt(options.timeout, 10) || 10000;
 
-  if (spinner) spinner.text = `Sending to remote: ${url}`;
+  if (spinner) spinner.text = `Sending to hosted API...`;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Api-Key': options.resolvedApiKey,
+    'X-SpecShield-Client': 'cli',
+    'X-SpecShield-Version': version,
+  };
 
   try {
     const response = await axios.post(
       url,
       { baseSpec: baseRaw, targetSpec: targetRaw },
-      { timeout, headers: { 'Content-Type': 'application/json' } }
+      { timeout, headers }
     );
     return response.data;
   } catch (err) {
@@ -167,7 +193,8 @@ function mergeOptions(config, cliOpts) {
       ...(config.ignore || []),
     ],
     severity: cliOpts.severity || config.severity || 'error',
-    remoteUrl: cliOpts.remoteUrl || (config.remote && config.remote.enabled ? config.remote.url : null),
+    remote: cliOpts.remote || (config.remote && config.remote.enabled) || false,
+    remoteUrl: cliOpts.remoteUrl || null,
     timeout: cliOpts.timeout || (config.remote && config.remote.timeout) || 10000,
   };
 }
