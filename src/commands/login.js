@@ -6,7 +6,7 @@ const ora = require('ora');
 const axios = require('axios');
 const { setStoredApiKey, CONFIG_PATH } = require('../config/localConfig');
 
-const HOSTED_API_URL = 'https://api.specshield.io';
+const HOSTED_API_URL = 'http://specshield.io';
 
 const login = new Command('login');
 

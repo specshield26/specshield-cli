@@ -16,7 +16,7 @@ const logger = require('../utils/logger');
 const fsExtra = require('fs-extra');
 const { getStoredApiKey } = require('../config/localConfig');
 
-const HOSTED_API_URL = 'https://api.specshield.io';
+const HOSTED_API_URL = 'http://specshield.io';
 
 const compare = new Command('compare');
 
