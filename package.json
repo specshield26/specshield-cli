@@ -1,6 +1,6 @@
 {
   "name": "specshield",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "CLI to compare OpenAPI/Swagger specs and detect breaking changes for CI/CD pipelines and local developer workflows.",
   "main": "src/cli.js",
   "bin": {
