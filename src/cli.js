@@ -5,6 +5,7 @@ const { version } = require('../package.json');
 const compareCommand = require('./commands/compare');
 const loginCommand = require('./commands/login');
 const logoutCommand = require('./commands/logout');
+const contractsCommand = require('./commands/contracts');
 
 const program = new Command();
 
@@ -16,6 +17,7 @@ program
 program.addCommand(compareCommand);
 program.addCommand(loginCommand);
 program.addCommand(logoutCommand);
+program.addCommand(contractsCommand);
 
 program.parseAsync(process.argv).catch((err) => {
   const logger = require('./utils/logger');

@@ -17,6 +17,16 @@ Compare OpenAPI and Swagger specs, detect breaking changes, and fail CI before i
 - [Authentication](#authentication)
 - [Generate an API Token](#generate-an-api-token)
 - [Remote Compare](#remote-compare)
+- [Contracts — Consumer-Driven Testing](#contracts--consumer-driven-testing)
+  - [Contract File Format](#contract-file-format)
+  - [Publish a Contract](#publish-a-contract)
+  - [List Contracts](#list-contracts)
+  - [Get Latest Contract](#get-latest-contract)
+  - [Verify a Contract](#verify-a-contract)
+  - [Verification History](#verification-history)
+  - [Can I Deploy?](#can-i-deploy)
+  - [Full Publish → Verify → Deploy Workflow](#full-publish--verify--deploy-workflow)
+  - [Contracts in CI/CD](#contracts-in-cicd)
 - [Config File](#config-file)
 - [All Options](#all-options)
 - [Exit Codes](#exit-codes)
@@ -190,6 +200,479 @@ The CLI reads your API token (from flag, env var, or stored config) and sends it
 
 ```
 Error: No API key found. Run: specshield login --api-key <KEY>
+```
+
+---
+
+---
+
+## Contracts — Consumer-Driven Testing
+
+SpecShield Contracts lets consumer teams publish API expectations (contracts) to a central registry. Provider teams then verify their service satisfies those contracts before deploying.
+
+**Why contract testing?**
+- Catch provider-side regressions before they reach consumers
+- Enforce an agreed-upon API shape across services
+- Gate deployments on verified contracts with `can-i-deploy`
+
+All contract commands require an API token. See [Authentication](#authentication).
+
+---
+
+### Contract File Format
+
+Create a `.json` file describing the expected API interactions:
+
+```json
+{
+  "consumer": {
+    "name": "checkout-ui",
+    "version": "1.2.0"
+  },
+  "provider": {
+    "name": "payment-service"
+  },
+  "contractName": "create-payment",
+  "contractType": "HTTP",
+  "interactions": [
+    {
+      "description": "create payment",
+      "request": {
+        "method": "POST",
+        "path": "/payments",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "orderId": "ORD-123",
+          "amount": 100,
+          "currency": "INR"
+        }
+      },
+      "expectedResponse": {
+        "status": 201,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "paymentId": "PAY-123",
+          "status": "CREATED"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "generatedBy": "specshield-cli",
+    "contractFormatVersion": "1.0"
+  }
+}
+```
+
+The `consumer.name`, `provider.name`, and `contractName` fields are used to identify the contract in the registry. CLI flags (`--consumer`, `--provider`, `--contract-name`) override file values if provided.
+
+---
+
+### Publish a Contract
+
+```bash
+specshield contracts publish \
+  --file ./contracts/create-payment.json \
+  --org acme
+```
+
+With all flags explicitly set (flags override file values):
+
+```bash
+specshield contracts publish \
+  --file ./contracts/create-payment.json \
+  --org acme \
+  --consumer checkout-ui \
+  --provider payment-service \
+  --contract-name create-payment \
+  --consumer-version 1.2.0 \
+  --tag main
+```
+
+**Example output:**
+
+```
+  ✔  Contract Published Successfully
+  ─────────────────────────────────────────────────────
+  Contract ID     : 42
+  Contract Name   : create-payment
+  Consumer        : checkout-ui
+  Provider        : payment-service
+  Version         : 3
+  Status          : PUBLISHED
+  Content Hash    : a3f9c1d2e7b8...
+  Published At    : 06/04/2026 14:30:00
+
+  ➜  Run: specshield contracts verify --contract-id 42 --base-url http://localhost:8080
+```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--file <path>` | Path to contract JSON file (required) |
+| `--org <key>` | Organization key |
+| `--consumer <key>` | Consumer service key (overrides file) |
+| `--provider <key>` | Provider service key (overrides file) |
+| `--consumer-version <ver>` | Consumer version tag |
+| `--contract-name <name>` | Contract name (overrides file) |
+| `--tag <tag>` | Git branch or release tag |
+| `--server <url>` | SpecShield server URL (default: `https://specshield.io`) |
+| `--api-token <token>` | API token |
+
+---
+
+### List Contracts
+
+```bash
+specshield contracts list
+```
+
+Filter by provider:
+
+```bash
+specshield contracts list --provider payment-service
+```
+
+Filter by consumer, org, status:
+
+```bash
+specshield contracts list \
+  --consumer checkout-ui \
+  --provider payment-service \
+  --status PUBLISHED
+```
+
+Output raw JSON:
+
+```bash
+specshield contracts list --json
+```
+
+**Example output:**
+
+```
+  SpecShield Contract Registry
+  ─────────────────────────────────────────────────────
+  Showing 2 of 2 contracts
+
+  ID  Contract Name    Consumer      Provider         Ver  Status     Last Verify  Published
+  ──  ───────────────  ────────────  ───────────────  ───  ─────────  ───────────  ─────────────────────
+  42  create-payment   checkout-ui   payment-service  3    PUBLISHED  SUCCESS      06/04/2026 14:30:00
+  41  get-order-status order-ui      order-service    1    PUBLISHED  FAILED       05/04/2026 09:15:00
+```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--consumer <key>` | Filter by consumer |
+| `--provider <key>` | Filter by provider |
+| `--org <key>` | Filter by organization |
+| `--status <status>` | Filter by status (`PUBLISHED` / `DEPRECATED`) |
+| `--contract-name <name>` | Filter by contract name |
+| `--page <n>` | Page number (0-based, default: `0`) |
+| `--size <n>` | Page size (default: `20`) |
+| `--json` | Output raw JSON |
+
+---
+
+### Get Latest Contract
+
+```bash
+specshield contracts latest \
+  --consumer checkout-ui \
+  --provider payment-service \
+  --contract-name create-payment
+```
+
+Print the full contract content (interactions, body, etc.):
+
+```bash
+specshield contracts latest \
+  --consumer checkout-ui \
+  --provider payment-service \
+  --json
+```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--consumer <key>` | Consumer service key |
+| `--provider <key>` | Provider service key |
+| `--org <key>` | Organization key |
+| `--contract-name <name>` | Contract name |
+| `--json` | Print full contract JSON |
+
+---
+
+### Verify a Contract
+
+Run the contract against a live provider. SpecShield replays each interaction against the `--base-url` and compares the response to the expected values.
+
+```bash
+specshield contracts verify \
+  --contract-id 42 \
+  --base-url http://localhost:8080
+```
+
+With version and environment tags:
+
+```bash
+specshield contracts verify \
+  --contract-id 42 \
+  --base-url https://payment-service.staging.internal \
+  --provider-version v2.1.0 \
+  --env staging
+```
+
+Output raw JSON (for CI parsing):
+
+```bash
+specshield contracts verify \
+  --contract-id 42 \
+  --base-url http://localhost:8080 \
+  --json
+```
+
+**Example output (pass):**
+
+```
+  ✔  Verification PASSED  (1/1 interactions)
+  ─────────────────────────────────────────────────────
+  Verification ID : 101
+  Contract ID     : 42
+  Status          : SUCCESS
+  Started At      : 06/04/2026 14:35:00
+  Completed At    : 06/04/2026 14:35:01
+
+  ➜  Run: specshield contracts can-i-deploy --provider payment-service --version v2.1.0
+```
+
+**Example output (fail):**
+
+```
+  ✖  Verification FAILED  (0/1 interactions passed, 1 failed)
+  ─────────────────────────────────────────────────────
+  Verification ID : 102
+  Contract ID     : 42
+  Status          : FAILED
+
+  Mismatches
+  ─────────────────────────────────────────────────────
+  ● [create payment] STATUS_CODE_MISMATCH at $.status
+    expected: 201  →  actual: 200
+    Expected status 201 but got 200
+
+  ➜  Run: specshield contracts history --contract-id 42 to inspect previous runs
+```
+
+**Exit codes:** `0` = PASSED, `1` = FAILED, `2` = error
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--contract-id <id>` | Contract ID to verify (required) |
+| `--base-url <url>` | Provider base URL (required, e.g. `http://localhost:8080`) |
+| `--provider-version <ver>` | Provider version tag |
+| `--env <environment>` | Environment label (`staging`, `qa`, `production`) |
+| `--mode <mode>` | `LIVE` or `REPLAY` (default: `LIVE`) |
+| `--json` | Output raw JSON |
+
+---
+
+### Verification History
+
+```bash
+specshield contracts history --contract-id 42
+```
+
+**Example output:**
+
+```
+  Verification History — Contract 42
+  ─────────────────────────────────────────────────────
+
+  ID   Status   Environment  Provider Version  Mode  Completed At
+  ───  ───────  ───────────  ────────────────  ────  ─────────────────────
+  102  FAILED   staging      v2.1.0            LIVE  06/04/2026 14:35:01
+  101  SUCCESS  staging      v2.0.0            LIVE  05/04/2026 10:00:00
+  98   SUCCESS  qa           v1.9.0            LIVE  01/04/2026 08:30:00
+```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--contract-id <id>` | Contract ID (required) |
+| `--json` | Output raw JSON |
+
+---
+
+### Can I Deploy?
+
+Check whether a provider version has passing verifications for all associated contracts:
+
+```bash
+specshield contracts can-i-deploy \
+  --provider payment-service \
+  --version v2.1.0
+```
+
+Scoped to a specific environment:
+
+```bash
+specshield contracts can-i-deploy \
+  --provider payment-service \
+  --version v2.1.0 \
+  --env production
+```
+
+**Example output (allowed):**
+
+```
+  ✔  PASS: payment-service v2.1.0 is deployable in production
+  ─────────────────────────────────────────────────────
+
+  Contract Decisions
+  ✔ Contract ID 42 — SUCCESS
+    All contracts verified
+```
+
+**Example output (blocked):**
+
+```
+  ✖  FAIL: payment-service v2.1.0 is NOT deployable in production
+  ─────────────────────────────────────────────────────
+
+  Contract Decisions
+  ✖ Contract ID 43 — FAILED
+    Unverified or failed contracts found
+
+  ➜  Run: specshield contracts verify --contract-id 43 --base-url <URL>
+  ➜  to verify pending contracts before deploying
+```
+
+**Exit codes:** `0` = deployable, `1` = blocked, `2` = error
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--provider <key>` | Provider service key (required) |
+| `--version <ver>` | Provider version to check (required) |
+| `--env <environment>` | Target environment |
+| `--json` | Output raw JSON |
+
+---
+
+### Full Publish → Verify → Deploy Workflow
+
+```bash
+# 1. Consumer team publishes a contract
+specshield contracts publish \
+  --file ./contracts/create-payment.json \
+  --org acme
+
+# 2. Provider team starts their service locally
+./gradlew bootRun &
+
+# 3. Provider team verifies the contract
+specshield contracts verify \
+  --contract-id 42 \
+  --base-url http://localhost:8080 \
+  --provider-version v2.1.0 \
+  --env staging
+
+# 4. Gate the deployment
+specshield contracts can-i-deploy \
+  --provider payment-service \
+  --version v2.1.0 \
+  --env staging
+```
+
+---
+
+### Contracts in CI/CD
+
+#### GitHub Actions — Publish on consumer change
+
+```yaml
+name: Publish Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+
+jobs:
+  publish-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install -g specshield
+      - name: Publish contract
+        env:
+          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
+        run: |
+          specshield contracts publish \
+            --file ./contracts/create-payment.json \
+            --org acme \
+            --tag ${{ github.ref_name }}
+```
+
+#### GitHub Actions — Verify + can-i-deploy on provider change
+
+```yaml
+name: Contract Verification
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  verify-contracts:
+    runs-on: ubuntu-latest
+    services:
+      payment-service:
+        image: myorg/payment-service:${{ github.sha }}
+        ports:
+          - 8080:8080
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install -g specshield
+
+      - name: Verify contract
+        env:
+          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
+        run: |
+          specshield contracts verify \
+            --contract-id ${{ vars.PAYMENT_CONTRACT_ID }} \
+            --base-url http://localhost:8080 \
+            --provider-version ${{ github.sha }} \
+            --env staging
+
+      - name: Can I deploy?
+        env:
+          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
+        run: |
+          specshield contracts can-i-deploy \
+            --provider payment-service \
+            --version ${{ github.sha }} \
+            --env staging
 ```
 
 ---
