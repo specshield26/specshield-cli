@@ -5,7 +5,89 @@
 [![license](https://img.shields.io/badge/license-MIT-blue)](#license)
 [![node](https://img.shields.io/badge/node-%3E%3D18-green)](https://nodejs.org)
 
-Compare OpenAPI and Swagger specs, detect breaking changes, and fail CI before incompatible API changes reach production.
+## 🚀 Prevent Breaking API Changes Before They Reach Production
+
+**SpecShield is a Pact alternative for OpenAPI** that helps developers  
+**detect breaking API changes in CI/CD** and act as a powerful  
+**OpenAPI diff tool for modern backend teams.**
+
+---
+
+## 👀 See it in action
+
+```bash
+$ specshield compare base.yaml target.yaml --fail-on-breaking
+
+✖ BREAKING CHANGES DETECTED
+
+  1. DELETE /users endpoint removed
+  2. POST /payments request field "amount" changed from optional to required
+  3. GET /orders/{id} response field "status" type changed: string -> object
+
+Summary
+- Breaking changes : 3
+- Modifications    : 1
+- Additions        : 2
+- Warnings         : 0
+
+CI Result: FAILED
+Exit Code: 1
+```
+
+These are the kinds of changes that break clients in production.  
+SpecShield catches them early so your CI can block unsafe deployments.
+
+### Safe change example
+
+```bash
+$ specshield compare base.yaml target.yaml --fail-on-breaking
+
+✔ NO BREAKING CHANGES FOUND
+
+Summary
+- Breaking changes : 0
+- Modifications    : 1
+- Additions        : 3
+- Warnings         : 1
+
+CI Result: PASSED
+Exit Code: 0
+```
+
+---
+
+## ⚡ 30-second quick start
+
+```bash
+npm install -g specshield
+specshield compare base.yaml target.yaml --fail-on-breaking
+```
+
+👉 No account required for local compare
+
+---
+
+## 💡 Useful for
+
+- Preventing accidental API breakage in pull requests
+- Failing CI when breaking changes are introduced
+- Tracking API drift across versions
+- Enforcing contracts between consumer and provider services
+
+---
+
+## 🌐 Upgrade to Remote
+
+Local compare is free and unlimited.
+
+Remote mode unlocks:
+
+- 📊 API change history
+- 👥 Team collaboration
+- 🚦 Deployment gating (`can-i-deploy`)
+- 🔗 Contract testing across services
+
+👉 https://specshield.io
 
 ---
 
@@ -15,7 +97,7 @@ Compare OpenAPI and Swagger specs, detect breaking changes, and fail CI before i
 - [Installation](#installation)
 - [Local Compare](#local-compare)
 - [Authentication](#authentication)
-- [Generate an API Token](#generate-an-api-token)
+  - [Generate an API Token](#generate-an-api-token)
 - [Remote Compare](#remote-compare)
 - [Contracts — Consumer-Driven Testing](#contracts--consumer-driven-testing)
   - [Contract File Format](#contract-file-format)
@@ -37,12 +119,11 @@ Compare OpenAPI and Swagger specs, detect breaking changes, and fail CI before i
 
 ## What is SpecShield CLI?
 
-SpecShield CLI is a command-line tool for comparing two OpenAPI/Swagger specifications and detecting what changed between them. It classifies changes into:
+SpecShield CLI is a developer-first **OpenAPI diff tool** and  
+**contract testing solution** that helps prevent breaking API changes.
 
-- **Breaking changes** — removed endpoints, changed required fields, incompatible type changes
-- **Modifications** — changed behavior that may or may not break clients
-- **Additions** — new endpoints or fields
-- **Warnings** — low-severity notices
+It works as a lightweight **Pact alternative for OpenAPI**, designed for  
+modern microservices and CI/CD pipelines.
 
 It works in two modes:
 
@@ -131,7 +212,7 @@ This validates the token against the SpecShield API and saves it to `~/.specshie
 
 **Example output:**
 
-```
+```text
 ✔ Logged in successfully.
 
   Customer:  Jane Smith
@@ -198,11 +279,9 @@ specshield compare base.yaml target.yaml --remote --json --output result.json
 
 The CLI reads your API token (from flag, env var, or stored config) and sends it as an `X-Api-Key` header with each request. If no token is found, the command exits with an error:
 
-```
+```text
 Error: No API key found. Run: specshield login --api-key <KEY>
 ```
-
----
 
 ---
 
@@ -216,8 +295,6 @@ SpecShield Contracts lets consumer teams publish API expectations (contracts) to
 - Gate deployments on verified contracts with `can-i-deploy`
 
 All contract commands require an API token. See [Authentication](#authentication).
-
----
 
 ### Contract File Format
 
@@ -270,32 +347,30 @@ Create a `.json` file describing the expected API interactions:
 
 The `consumer.name`, `provider.name`, and `contractName` fields are used to identify the contract in the registry. CLI flags (`--consumer`, `--provider`, `--contract-name`) override file values if provided.
 
----
-
 ### Publish a Contract
 
 ```bash
-specshield contracts publish \
-  --file ./contracts/create-payment.json \
+specshield contracts publish \\
+  --file ./contracts/create-payment.json \\
   --org acme
 ```
 
 With all flags explicitly set (flags override file values):
 
 ```bash
-specshield contracts publish \
-  --file ./contracts/create-payment.json \
-  --org acme \
-  --consumer checkout-ui \
-  --provider payment-service \
-  --contract-name create-payment \
-  --consumer-version 1.2.0 \
+specshield contracts publish \\
+  --file ./contracts/create-payment.json \\
+  --org acme \\
+  --consumer checkout-ui \\
+  --provider payment-service \\
+  --contract-name create-payment \\
+  --consumer-version 1.2.0 \\
   --tag main
 ```
 
 **Example output:**
 
-```
+```text
   ✔  Contract Published Successfully
   ─────────────────────────────────────────────────────
   Contract ID     : 42
@@ -324,8 +399,6 @@ specshield contracts publish \
 | `--server <url>` | SpecShield server URL (default: `https://specshield.io`) |
 | `--api-token <token>` | API token |
 
----
-
 ### List Contracts
 
 ```bash
@@ -341,9 +414,9 @@ specshield contracts list --provider payment-service
 Filter by consumer, org, status:
 
 ```bash
-specshield contracts list \
-  --consumer checkout-ui \
-  --provider payment-service \
+specshield contracts list \\
+  --consumer checkout-ui \\
+  --provider payment-service \\
   --status PUBLISHED
 ```
 
@@ -355,7 +428,7 @@ specshield contracts list --json
 
 **Example output:**
 
-```
+```text
   SpecShield Contract Registry
   ─────────────────────────────────────────────────────
   Showing 2 of 2 contracts
@@ -379,23 +452,21 @@ specshield contracts list --json
 | `--size <n>` | Page size (default: `20`) |
 | `--json` | Output raw JSON |
 
----
-
 ### Get Latest Contract
 
 ```bash
-specshield contracts latest \
-  --consumer checkout-ui \
-  --provider payment-service \
+specshield contracts latest \\
+  --consumer checkout-ui \\
+  --provider payment-service \\
   --contract-name create-payment
 ```
 
 Print the full contract content (interactions, body, etc.):
 
 ```bash
-specshield contracts latest \
-  --consumer checkout-ui \
-  --provider payment-service \
+specshield contracts latest \\
+  --consumer checkout-ui \\
+  --provider payment-service \\
   --json
 ```
 
@@ -409,40 +480,38 @@ specshield contracts latest \
 | `--contract-name <name>` | Contract name |
 | `--json` | Print full contract JSON |
 
----
-
 ### Verify a Contract
 
 Run the contract against a live provider. SpecShield replays each interaction against the `--base-url` and compares the response to the expected values.
 
 ```bash
-specshield contracts verify \
-  --contract-id 42 \
+specshield contracts verify \\
+  --contract-id 42 \\
   --base-url http://localhost:8080
 ```
 
 With version and environment tags:
 
 ```bash
-specshield contracts verify \
-  --contract-id 42 \
-  --base-url https://payment-service.staging.internal \
-  --provider-version v2.1.0 \
+specshield contracts verify \\
+  --contract-id 42 \\
+  --base-url https://payment-service.staging.internal \\
+  --provider-version v2.1.0 \\
   --env staging
 ```
 
 Output raw JSON (for CI parsing):
 
 ```bash
-specshield contracts verify \
-  --contract-id 42 \
-  --base-url http://localhost:8080 \
+specshield contracts verify \\
+  --contract-id 42 \\
+  --base-url http://localhost:8080 \\
   --json
 ```
 
 **Example output (pass):**
 
-```
+```text
   ✔  Verification PASSED  (1/1 interactions)
   ─────────────────────────────────────────────────────
   Verification ID : 101
@@ -456,7 +525,7 @@ specshield contracts verify \
 
 **Example output (fail):**
 
-```
+```text
   ✖  Verification FAILED  (0/1 interactions passed, 1 failed)
   ─────────────────────────────────────────────────────
   Verification ID : 102
@@ -485,8 +554,6 @@ specshield contracts verify \
 | `--mode <mode>` | `LIVE` or `REPLAY` (default: `LIVE`) |
 | `--json` | Output raw JSON |
 
----
-
 ### Verification History
 
 ```bash
@@ -495,7 +562,7 @@ specshield contracts history --contract-id 42
 
 **Example output:**
 
-```
+```text
   Verification History — Contract 42
   ─────────────────────────────────────────────────────
 
@@ -513,30 +580,28 @@ specshield contracts history --contract-id 42
 | `--contract-id <id>` | Contract ID (required) |
 | `--json` | Output raw JSON |
 
----
-
 ### Can I Deploy?
 
 Check whether a provider version has passing verifications for all associated contracts:
 
 ```bash
-specshield contracts can-i-deploy \
-  --provider payment-service \
+specshield contracts can-i-deploy \\
+  --provider payment-service \\
   --version v2.1.0
 ```
 
 Scoped to a specific environment:
 
 ```bash
-specshield contracts can-i-deploy \
-  --provider payment-service \
-  --version v2.1.0 \
+specshield contracts can-i-deploy \\
+  --provider payment-service \\
+  --version v2.1.0 \\
   --env production
 ```
 
 **Example output (allowed):**
 
-```
+```text
   ✔  PASS: payment-service v2.1.0 is deployable in production
   ─────────────────────────────────────────────────────
 
@@ -547,7 +612,7 @@ specshield contracts can-i-deploy \
 
 **Example output (blocked):**
 
-```
+```text
   ✖  FAIL: payment-service v2.1.0 is NOT deployable in production
   ─────────────────────────────────────────────────────
 
@@ -570,34 +635,30 @@ specshield contracts can-i-deploy \
 | `--env <environment>` | Target environment |
 | `--json` | Output raw JSON |
 
----
-
 ### Full Publish → Verify → Deploy Workflow
 
 ```bash
 # 1. Consumer team publishes a contract
-specshield contracts publish \
-  --file ./contracts/create-payment.json \
+specshield contracts publish \\
+  --file ./contracts/create-payment.json \\
   --org acme
 
 # 2. Provider team starts their service locally
 ./gradlew bootRun &
 
 # 3. Provider team verifies the contract
-specshield contracts verify \
-  --contract-id 42 \
-  --base-url http://localhost:8080 \
-  --provider-version v2.1.0 \
+specshield contracts verify \\
+  --contract-id 42 \\
+  --base-url http://localhost:8080 \\
+  --provider-version v2.1.0 \\
   --env staging
 
 # 4. Gate the deployment
-specshield contracts can-i-deploy \
-  --provider payment-service \
-  --version v2.1.0 \
+specshield contracts can-i-deploy \\
+  --provider payment-service \\
+  --version v2.1.0 \\
   --env staging
 ```
-
----
 
 ### Contracts in CI/CD
 
@@ -625,9 +686,9 @@ jobs:
         env:
           SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
         run: |
-          specshield contracts publish \
-            --file ./contracts/create-payment.json \
-            --org acme \
+          specshield contracts publish \\
+            --file ./contracts/create-payment.json \\
+            --org acme \\
             --tag ${{ github.ref_name }}
 ```
 
@@ -659,19 +720,19 @@ jobs:
         env:
           SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
         run: |
-          specshield contracts verify \
-            --contract-id ${{ vars.PAYMENT_CONTRACT_ID }} \
-            --base-url http://localhost:8080 \
-            --provider-version ${{ github.sha }} \
+          specshield contracts verify \\
+            --contract-id ${{ vars.PAYMENT_CONTRACT_ID }} \\
+            --base-url http://localhost:8080 \\
+            --provider-version ${{ github.sha }} \\
             --env staging
 
       - name: Can I deploy?
         env:
           SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
         run: |
-          specshield contracts can-i-deploy \
-            --provider payment-service \
-            --version ${{ github.sha }} \
+          specshield contracts can-i-deploy \\
+            --provider payment-service \\
+            --version ${{ github.sha }} \\
             --env staging
 ```
 
@@ -763,8 +824,8 @@ jobs:
 
       - name: Compare specs
         run: |
-          specshield compare /tmp/base-spec.yaml api/openapi.yaml \
-            --fail-on-breaking \
+          specshield compare /tmp/base-spec.yaml api/openapi.yaml \\
+            --fail-on-breaking \\
             --output spec-diff.json
 
       - name: Upload diff report
@@ -784,9 +845,9 @@ Add your API token as a GitHub Actions secret named `SPECSHIELD_API_KEY`, then:
         env:
           SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
         run: |
-          specshield compare /tmp/base-spec.yaml api/openapi.yaml \
-            --remote \
-            --fail-on-breaking \
+          specshield compare /tmp/base-spec.yaml api/openapi.yaml \\
+            --remote \\
+            --fail-on-breaking \\
             --output spec-diff.json
 ```
 
