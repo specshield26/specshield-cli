@@ -1,0 +1,90 @@
+openapi: "3.0.0"
+info:
+  title: Payment API
+  version: "2.0.0"
+
+paths:
+  /payments:
+    post:
+      operationId: createPayment
+      summary: Create a payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orderId
+                - amount
+                - currency
+                - customerId
+              properties:
+                orderId:
+                  type: string
+                amount:
+                  type: integer
+                currency:
+                  type: string
+                customerId:
+                  type: string
+      responses:
+        "200":
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /payments/{paymentId}:
+    get:
+      operationId: getPayment
+      summary: Get payment by ID
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /refunds:
+    post:
+      operationId: createRefund
+      summary: Create a refund
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - paymentId
+              properties:
+                paymentId:
+                  type: string
+      responses:
+        "201":
+          description: Refund created
+
+components:
+  schemas:
+    Payment:
+      type: object
+      properties:
+        paymentId:
+          type: string
+        orderId:
+          type: string
+        paymentStatus:
+          type: string
+        totalAmount:
+          type: integer
+        currency:
+          type: string

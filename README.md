@@ -192,8 +192,9 @@ Track API drift over time across your entire platform. Know what changed, when, 
 
 ## 🎥 Demo
 
-> _Screenshot / GIF coming soon._
-> Try it yourself in 30 seconds — `npm install -g specshield`
+![SpecShield CLI Demo](demo/specshield-demo.gif)
+
+> `specshield compare payment-api-v1.yaml payment-api-v2.yaml --fail-on-breaking`
 
 ---
 
