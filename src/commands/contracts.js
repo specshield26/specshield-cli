@@ -366,7 +366,7 @@ const verifyCommand = new Command('verify')
         return;
       }
 
-      const summary   = result.summary || {};
+      const summary   = result.resultSummary || result.summary || {};
       const total     = summary.total   ?? 0;
       const passed    = summary.passed  ?? 0;
       const failed    = summary.failed  ?? 0;
