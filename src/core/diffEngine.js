@@ -153,7 +153,7 @@ function toParamMap(params) {
 
 function diffResponses(path, method, baseResponses, targetResponses, diffs) {
   for (const statusCode of Object.keys(baseResponses)) {
-    if (!targetResponses[statusCode]) {
+    if (!(statusCode in targetResponses)) {
       diffs.push({
         type: 'RESPONSE_REMOVED',
         path,
@@ -167,7 +167,7 @@ function diffResponses(path, method, baseResponses, targetResponses, diffs) {
   }
 
   for (const statusCode of Object.keys(targetResponses)) {
-    if (!baseResponses[statusCode]) {
+    if (!(statusCode in baseResponses)) {
       diffs.push({
         type: 'RESPONSE_ADDED',
         path,
