@@ -192,7 +192,13 @@ Track API drift over time across your entire platform. Know what changed, when, 
 
 ## 🎥 Demo
 
-![SpecShield CLI Demo](demo/specshield-demo.gif)
+[![SpecShield Demo — API Breaking Change Detection & Contract Testing](https://img.youtube.com/vi/mugDyQQGqZw/maxresdefault.jpg)](https://www.youtube.com/watch?v=mugDyQQGqZw)
+
+> Watch: Catching a breaking API change before it hits production — compare specs, publish contracts, verify providers, and gate deployments with `can-i-deploy`.
+
+**CLI preview:**
+
+![SpecShield CLI Demo](https://raw.githubusercontent.com/specshield26/specshield-cli/main/demo/specshield-demo.gif)
 
 > `specshield compare payment-api-v1.yaml payment-api-v2.yaml --fail-on-breaking`
 
