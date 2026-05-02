@@ -7,17 +7,16 @@
 
 ---
 
-> **OpenAPI Diff · Swagger Diff · API Breaking Change Detection · Contract Testing · Pact Alternative · API Governance · CI/CD API Validation · API Drift Detection**
+> **OpenAPI Diff · Swagger Diff · API Breaking Change Detection · Contract Testing · Pact Alternative · API Governance · CI/CD API Validation · API Drift Detection · Bi-Directional Contract Testing**
 
 ---
 
 ## Stop Breaking APIs in Production
 
-**SpecShield** detects breaking API changes and runs contract tests directly in your CI/CD pipeline —
-before they become production incidents.
+**SpecShield** detects breaking API changes, runs contract tests, and gates deployments — directly in your CI/CD pipeline before they become production incidents.
 
 ```
-OpenAPI diff  +  contract testing  +  deployment gating  —  in one CLI.
+OpenAPI diff  +  contract testing  +  bi-directional contracts  +  GitHub PR checks  —  in one CLI.
 ```
 
 No broker. No complex setup. Works in 30 seconds.
@@ -135,19 +134,21 @@ That's it. Works with any OpenAPI 3.x YAML or JSON spec.
 
 ## Local vs Cloud
 
-| Feature | Local (Free) | Cloud (specshield.io) |
-|---|---|---|
-| Compare two spec files | ✅ | ✅ |
-| Breaking change detection | ✅ | ✅ |
-| JSON / human output | ✅ | ✅ |
-| Fail CI on breaking change | ✅ | ✅ |
-| **Compare history & dashboard** | ❌ | ✅ |
-| **Contract testing registry** | ❌ | ✅ |
-| **can-i-deploy gating** | ❌ | ✅ |
-| **Team collaboration** | ❌ | ✅ |
-| **API drift trends** | ❌ | ✅ |
-
-Local is great for getting started. Cloud is what your team ships with.
+| Feature | Local (Free) | Cloud Free | Cloud Pro |
+|---|---|---|---|
+| Compare two spec files | ✅ | ✅ | ✅ |
+| Breaking change detection | ✅ | ✅ | ✅ |
+| JSON / human output | ✅ | ✅ | ✅ |
+| Fail CI on breaking change | ✅ | ✅ | ✅ |
+| **Compare history & dashboard** | ❌ | ✅ | ✅ |
+| **CDCT contract testing registry** | ❌ | ✅ | ✅ |
+| **CDCT can-i-deploy gating** | ❌ | ✅ | ✅ |
+| **GitHub App PR checks** | ❌ | ✅ | ✅ |
+| **BDCT bi-directional contracts** | ❌ | ❌ | ✅ |
+| **BDCT can-i-deploy gating** | ❌ | ❌ | ✅ |
+| **BDCT compatibility matrix** | ❌ | ❌ | ✅ |
+| **Team collaboration** | ❌ | ❌ | ✅ |
+| **API drift trends** | ❌ | ✅ | ✅ |
 
 ---
 
@@ -190,13 +191,16 @@ Track API drift over time across your entire platform. Know what changed, when, 
 
 ## vs. Alternatives
 
-| Feature | SpecShield | Pact | openapi-diff |
+| Feature | SpecShield | Pact / Pactflow | openapi-diff |
 |---|---|---|---|
 | OpenAPI / Swagger native | ✅ | ❌ (code-level) | ✅ |
 | No broker required | ✅ | ❌ (needs Pact Broker) | ✅ |
-| Contract testing | ✅ | ✅ | ❌ |
+| Consumer-driven contract testing | ✅ | ✅ | ❌ |
+| **Bi-directional contract testing** | ✅ | ✅ (Pactflow paid) | ❌ |
 | Breaking change detection | ✅ | ❌ | ✅ |
 | can-i-deploy gating | ✅ | ✅ (via broker) | ❌ |
+| **GitHub App PR checks** | ✅ | ❌ | ❌ |
+| **Pact JSON contract import** | ✅ | ✅ | ❌ |
 | Hosted dashboard | ✅ | ✅ (Pactflow, paid) | ❌ |
 | Team collaboration | ✅ | ✅ (paid) | ❌ |
 | CLI-first workflow | ✅ | ❌ | ✅ |
@@ -208,8 +212,8 @@ Track API drift over time across your entire platform. Know what changed, when, 
 
 | Plan | Price | What's included |
 |---|---|---|
-| **Free** | $0 forever | Local compare, unlimited. Cloud: compare history, API keys, dashboard |
-| **Pro** | Coming soon | Team collaboration, advanced reporting, priority support |
+| **Free** | $0 forever | Local compare (unlimited) · Compare history & dashboard · CDCT contracts & can-i-deploy · GitHub App PR checks |
+| **Pro** | Coming soon | Everything in Free + BDCT bi-directional contracts · BDCT can-i-deploy & matrix · Team collaboration · Advanced reporting · Priority support |
 
 No credit card ever required for the free plan.
 **[Get started free →](https://specshield.io)**
@@ -291,14 +295,70 @@ specshield compare base.yaml target.yaml --remote --json --output result.json
 
 ---
 
-## Contract Testing
+## GitHub Integration
+
+**Automatic API contract checks on every pull request — no workflow YAML required.**
+
+Install the SpecShield GitHub App once and every PR that touches your OpenAPI spec gets:
+- A GitHub check run (pass/fail) visible directly on the PR
+- A PR comment with the full diff table — breaking changes highlighted in red
+- Configurable `fail-on-breaking` per repository
+
+### Install the GitHub App
+
+1. Go to **Dashboard → GitHub Integration** at [specshield.io](https://specshield.io)
+2. Click **Install GitHub App**
+3. Choose the repositories to enable (or select all)
+4. Done — no secrets, no workflow changes needed
+
+### How It Works
+
+When a PR is opened or updated, SpecShield:
+
+1. Fetches the OpenAPI spec from the base branch and the PR branch
+2. Runs the same diff engine as `specshield compare`
+3. Posts a GitHub check run — **Passed** if no breaking changes, **Failed** if breaking changes found
+4. Adds a PR comment with the full breakdown:
+
+```
+## SpecShield API Contract Check
+
+| Change | Type | Severity |
+|--------|------|----------|
+| POST /payments — "amount" required field added | Request schema | BREAKING |
+| GET /orders/{id} — "status" type changed | Response schema | BREAKING |
+| GET /users — new query param "filter" | Addition | NON-BREAKING |
+
+Breaking changes: 2 · Non-breaking: 1
+```
+
+### Configure Per Repository
+
+Add a `.specshield.yml` to your repo root:
+
+```yaml
+github:
+  specPath: api/openapi.yaml   # path to your spec (default: openapi.yaml)
+  failOnBreaking: true         # block PR merge on breaking changes (default: true)
+  commentOnPr: true            # post breakdown comment (default: true)
+```
+
+### Requirements
+
+- The spec file must exist on both the base branch and the PR branch
+- Supported formats: OpenAPI 3.x YAML or JSON
+- The GitHub App needs `pull_requests: write` and `checks: write` permissions (granted during install)
+
+---
+
+## Contract Testing (CDCT)
 
 Consumer-driven contract testing for microservices — without a broker.
 
 **How it works:**
 
 1. Consumer team publishes a contract (what they expect from the provider)
-2. Provider team verifies their service satisfies it
+2. Provider team verifies their service satisfies it by actually calling it
 3. `can-i-deploy` gates the deployment based on verification results
 
 ### Contract File Format
@@ -389,7 +449,7 @@ specshield contracts latest --consumer checkout-ui --provider payment-service --
 specshield contracts history --contract-id 42
 ```
 
-### Full Workflow
+### Full CDCT Workflow
 
 ```bash
 # 1. Consumer publishes contract
@@ -400,6 +460,294 @@ specshield contracts verify --contract-id 42 --base-url http://localhost:8080 --
 
 # 3. Gate the deployment
 specshield contracts can-i-deploy --provider payment-service --version v2.1.0
+```
+
+---
+
+## Bi-Directional Contract Testing (BDCT)
+
+**Spec-to-spec contract testing — no running services required.**
+
+BDCT is the static alternative to CDCT. Instead of running the provider server, both sides publish their OpenAPI specs. SpecShield compares them and flags mismatches immediately — ideal for teams that don't run services locally or in CI.
+
+> BDCT requires a **Pro plan**. [Upgrade at specshield.io/upgrade](https://specshield.io/upgrade)
+
+**CDCT vs BDCT:**
+
+| | CDCT | BDCT |
+|---|---|---|
+| How verification works | Replay requests against a live server | Compare OpenAPI specs statically |
+| Provider needs to run | Yes | No |
+| Feedback speed | After deploy to test env | Immediately on spec publish |
+| Pact JSON contracts | Supported | Supported (auto-converted) |
+| Best for | Runtime correctness | Early spec-level safety |
+
+### How BDCT Works
+
+1. Consumer team publishes an OpenAPI spec subset (the endpoints they use)
+2. Provider team publishes their full OpenAPI spec
+3. SpecShield compares them: endpoint presence, request schemas, response fields, status codes, types
+4. `can-i-deploy` gates the deployment — returns `0` only when all consumers are compatible
+
+### Publish a Provider Spec
+
+```bash
+specshield bdct publish-provider \
+  --org acme-store \
+  --provider payment-service \
+  --version v2.1.0 \
+  --spec ./api/openapi.yaml \
+  --env production
+```
+
+```
+  ✔  Provider spec published
+     Provider  : payment-service
+     Version   : v2.1.0
+     Env       : production
+     Auto-verifications triggered: 3
+```
+
+### Publish a Consumer Contract
+
+The consumer contract is an OpenAPI spec that describes only the endpoints the consumer uses:
+
+```yaml
+# consumer-contract.yaml — only the subset checkout-ui uses
+openapi: "3.0.0"
+info:
+  title: checkout-ui → payment-service contract
+  version: "1.0.0"
+paths:
+  /payments:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, amount, currency]
+              properties:
+                orderId: { type: string }
+                amount:  { type: number }
+                currency: { type: string }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paymentId: { type: string }
+                  status:    { type: string }
+```
+
+```bash
+specshield bdct publish-consumer \
+  --org acme-store \
+  --consumer checkout-ui \
+  --provider payment-service \
+  --version 2.0.0 \
+  --contract ./contracts/checkout-ui-payment.yaml
+```
+
+```
+  ✔  Consumer contract published
+     Consumer    : checkout-ui @ 2.0.0
+     Provider    : payment-service
+     Compatibility: COMPATIBLE
+```
+
+If the provider spec is already published, compatibility is checked immediately.
+
+**Pact JSON contracts are also accepted** — SpecShield auto-converts them:
+
+```bash
+specshield bdct publish-consumer \
+  --org acme-store \
+  --consumer checkout-ui \
+  --provider payment-service \
+  --version 2.0.0 \
+  --contract ./pacts/checkout-ui-payment-service.json
+```
+
+### Verify Compatibility
+
+Manually trigger a verification between a specific consumer/provider pair:
+
+```bash
+specshield bdct verify \
+  --org acme-store \
+  --consumer checkout-ui \
+  --consumer-version 2.0.0 \
+  --provider payment-service \
+  --provider-version v2.1.0 \
+  --env production
+```
+
+Compatible output:
+```
+  ✔  COMPATIBLE
+
+  Endpoints checked: 2
+  Compatible       : 2
+  Incompatible     : 0
+```
+
+Incompatible output:
+```
+  ✖  INCOMPATIBLE
+
+  Endpoints checked: 2
+  Compatible       : 1
+  Incompatible     : 1
+
+  Issues
+  ● POST /payments [ERROR] RESPONSE_FIELD_MISSING
+    field: $.status
+    Consumer expects it — provider spec does not return it
+
+  ● GET /payments/{id} [WARNING] TYPE_MISMATCH
+    field: $.amount
+    consumer: integer  →  provider: string
+```
+
+### Can I Deploy? (BDCT)
+
+```bash
+specshield bdct can-i-deploy \
+  --org acme-store \
+  --service payment-service \
+  --version v2.1.0 \
+  --env production
+```
+
+```
+  ✔  DEPLOYABLE
+
+  payment-service v2.1.0 is COMPATIBLE with all 3 consumer(s)
+```
+
+```
+  ✖  NOT DEPLOYABLE
+
+  payment-service v2.1.0 is INCOMPATIBLE with:
+    checkout-ui@2.0.0 (INCOMPATIBLE)
+    mobile-app@1.5.0  (INCOMPATIBLE)
+```
+
+Exit codes: `0` = deployable · `1` = blocked · `2` = error
+
+### Compatibility Matrix
+
+View the compatibility status across all consumer/provider pairs in your org:
+
+```bash
+specshield bdct matrix --org acme-store --env production
+```
+
+```
+  Compatibility Matrix  (env: production)
+
+                    payment-service  order-service
+  checkout-ui       COMPATIBLE       COMPATIBLE
+  mobile-app        INCOMPATIBLE     COMPATIBLE
+  partner-sdk       COMPATIBLE       UNKNOWN
+```
+
+### List Provider Specs
+
+```bash
+# All providers for the org
+specshield bdct list-providers --org acme-store
+
+# Filter by provider name
+specshield bdct list-providers --org acme-store --provider payment-service
+```
+
+```
+  Provider Specs
+
+  payment-service  v2.1.0   production   2025-05-01
+  payment-service  v2.0.0   staging      2025-04-20
+  order-service    v1.3.0   production   2025-04-28
+```
+
+### List Consumer Contracts
+
+```bash
+# All consumers for the org
+specshield bdct list-consumers --org acme-store
+
+# Filter by consumer or provider
+specshield bdct list-consumers --org acme-store --consumer checkout-ui
+specshield bdct list-consumers --org acme-store --provider payment-service
+```
+
+### List Verifications
+
+```bash
+specshield bdct list-verifications \
+  --org acme-store \
+  --provider payment-service \
+  --env production \
+  --page 0 \
+  --size 20
+```
+
+```
+  BDCT Verifications
+
+  Consumer     Consumer Ver  Provider          Provider Ver  Env         Status        Verified At
+  checkout-ui  2.0.0         payment-service   v2.1.0        production  COMPATIBLE    2025-05-01 14:30
+  mobile-app   1.5.0         payment-service   v2.1.0        production  INCOMPATIBLE  2025-05-01 14:30
+```
+
+### BDCT JSON Output
+
+All BDCT commands support `--json` for CI parsing:
+
+```bash
+specshield bdct can-i-deploy --org acme-store --service payment-service --version v2.1.0 --json
+```
+
+```json
+{
+  "deployable": false,
+  "service": "payment-service",
+  "version": "v2.1.0",
+  "environment": "production",
+  "reason": "payment-service v2.1.0 is INCOMPATIBLE with: checkout-ui@2.0.0 (INCOMPATIBLE)",
+  "verifications": [
+    {
+      "consumerName": "checkout-ui",
+      "consumerVersion": "2.0.0",
+      "status": "INCOMPATIBLE",
+      "compatibleCount": 1,
+      "incompatibleCount": 1
+    }
+  ]
+}
+```
+
+### Full BDCT Workflow
+
+```bash
+# 1. Provider publishes spec on every release
+specshield bdct publish-provider \
+  --org acme-store --provider payment-service \
+  --version v2.1.0 --spec ./api/openapi.yaml
+
+# 2. Each consumer publishes their contract once (update on contract change)
+specshield bdct publish-consumer \
+  --org acme-store --consumer checkout-ui \
+  --provider payment-service --version 2.0.0 \
+  --contract ./contracts/checkout-ui.yaml
+
+# 3. Gate the provider deployment
+specshield bdct can-i-deploy \
+  --org acme-store --service payment-service \
+  --version v2.1.0 --env production
 ```
 
 ---
@@ -432,7 +780,7 @@ jobs:
         run: specshield compare /tmp/base.yaml api/openapi.yaml --fail-on-breaking
 ```
 
-### On Push — Publish consumer contract
+### On Push — Publish consumer contract (CDCT)
 
 ```yaml
 name: Publish Contract
@@ -462,7 +810,7 @@ jobs:
             --tag ${{ github.ref_name }}
 ```
 
-### On Push — Verify provider + gate deployment
+### On Push — Verify provider + gate deployment (CDCT)
 
 ```yaml
 name: Contract Verification
@@ -499,6 +847,79 @@ jobs:
             --env staging
 ```
 
+### On Push — Publish provider spec (BDCT)
+
+```yaml
+name: BDCT Publish Provider Spec
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/openapi.yaml'
+
+jobs:
+  publish-bdct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install -g specshield
+      - name: Publish provider spec
+        env:
+          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
+        run: |
+          specshield bdct publish-provider \
+            --org ${{ vars.SPECSHIELD_ORG }} \
+            --provider payment-service \
+            --version ${{ github.sha }} \
+            --spec ./api/openapi.yaml \
+            --env production
+      - name: Gate deployment
+        env:
+          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
+        run: |
+          specshield bdct can-i-deploy \
+            --org ${{ vars.SPECSHIELD_ORG }} \
+            --service payment-service \
+            --version ${{ github.sha }} \
+            --env production
+```
+
+### On Contract Change — Publish consumer contract (BDCT)
+
+```yaml
+name: BDCT Publish Consumer Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/bdct/**'
+
+jobs:
+  publish-consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install -g specshield
+      - name: Publish consumer contract
+        env:
+          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
+        run: |
+          specshield bdct publish-consumer \
+            --org ${{ vars.SPECSHIELD_ORG }} \
+            --consumer checkout-ui \
+            --provider payment-service \
+            --version ${{ github.ref_name }} \
+            --contract ./contracts/bdct/checkout-ui-payment.yaml
+```
+
 ---
 
 ## Config File
@@ -517,6 +938,11 @@ remote:
   url: "https://specshield.io/compare"
   timeout: 10000
   # apiKey: ""  ← use env var instead
+
+github:
+  specPath: api/openapi.yaml
+  failOnBreaking: true
+  commentOnPr: true
 ```
 
 CLI flags always override config file values.
@@ -542,14 +968,31 @@ specshield compare <base> <target> [options]
 | `--config <path>` | Path to `.specshield.yml` |
 | `--timeout <ms>` | Request timeout for remote mode |
 
+```bash
+specshield bdct <subcommand> [options]
+```
+
+| Subcommand | Description |
+|---|---|
+| `publish-provider` | Publish a provider OpenAPI spec |
+| `publish-consumer` | Publish a consumer contract (OpenAPI subset or Pact JSON) |
+| `verify` | Manually trigger verification for a consumer/provider pair |
+| `can-i-deploy` | Check if a service version is safe to deploy |
+| `matrix` | View compatibility matrix across all pairs |
+| `list-providers` | List published provider specs |
+| `list-consumers` | List published consumer contracts |
+| `list-verifications` | List verification history |
+
+All `bdct` subcommands support `--json` for machine-readable output.
+
 ---
 
 ## Exit Codes
 
 | Code | Meaning |
 |---|---|
-| `0` | Clean — no breaking changes |
-| `1` | Breaking changes found with `--fail-on-breaking` |
+| `0` | Clean — no breaking changes / deployable |
+| `1` | Breaking changes found / not deployable |
 | `2` | Config error, missing token, or runtime error |
 
 ---

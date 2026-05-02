@@ -6,6 +6,7 @@ const compareCommand = require('./commands/compare');
 const loginCommand = require('./commands/login');
 const logoutCommand = require('./commands/logout');
 const contractsCommand = require('./commands/contracts');
+const bdctCommand = require('./commands/bdct');
 
 const program = new Command();
 
@@ -18,6 +19,7 @@ program.addCommand(compareCommand);
 program.addCommand(loginCommand);
 program.addCommand(logoutCommand);
 program.addCommand(contractsCommand);
+program.addCommand(bdctCommand);
 
 program.parseAsync(process.argv).catch((err) => {
   const logger = require('./utils/logger');
