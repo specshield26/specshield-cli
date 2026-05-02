@@ -615,7 +615,7 @@ const listConsumersCommand = new Command('list-consumers')
           c.consumer || c.consumerName || '—',
           c.provider || c.providerName || '—',
           chalk.cyan(c.version || '—'),
-          c.format || '—',
+          c.contractFormat || c.format || '—',
           fmtDate(c.publishedAt),
         ])
       );
