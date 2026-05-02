@@ -7,7 +7,7 @@
 
 ---
 
-> **OpenAPI Diff · Swagger Diff · API Breaking Change Detection · Contract Testing · Pact Alternative · API Governance · CI/CD API Validation · API Drift Detection · Bi-Directional Contract Testing**
+> **OpenAPI Diff · API Breaking Change Detection · Swagger Diff · Consumer-Driven Contract Testing · Pact Alternative · can-i-deploy · Bi-Directional Contract Testing · GitHub PR Checks · CI/CD**
 
 ---
 

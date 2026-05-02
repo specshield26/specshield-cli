@@ -1,7 +1,7 @@
 {
   "name": "specshield",
-  "version": "2.0.0",
-  "description": "CLI to compare OpenAPI/Swagger specs and detect breaking changes for CI/CD pipelines and local developer workflows.",
+  "version": "2.0.1",
+  "description": "CLI for OpenAPI breaking change detection, consumer-driven contract testing, and bi-directional contract verification — with can-i-deploy gating and GitHub PR checks.",
   "main": "src/cli.js",
   "bin": {
     "specshield": "./bin/specshield.js"
@@ -18,11 +18,8 @@
   "api-diff",
   "openapi-diff",
   "swagger-diff",
-  "api-diff-tool",
   "breaking-change-detection",
   "api-breaking-changes",
-  "prevent-breaking-api",
-  "api-regression",
   "api-compatibility",
   "contract-testing",
   "consumer-driven-contract",
@@ -30,7 +27,6 @@
   "contract-verification",
   "can-i-deploy",
   "ci-cd",
-  "devops",
   "github-actions",
   "cli",
   "developer-tools",
@@ -41,8 +37,11 @@
   "microservices",
   "api-quality",
   "api-governance",
-  "yaml",
-  "json"
+  "bi-directional-contract-testing",
+  "bdct",
+  "pact-json",
+  "github-app",
+  "api-drift"
 ],
   "license": "MIT",
   "files": [
