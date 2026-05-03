@@ -51,6 +51,26 @@ function hr() {
   return chalk.gray('  ─────────────────────────────────────────────────────');
 }
 
+/**
+ * Flatten a verification result's mismatches.
+ * Current backend returns `resultJson` (JSON string of [{endpoint,status,mismatches:[...]}]).
+ * Tolerate older shapes that put a flat array on `issues` or `mismatches`.
+ */
+function flattenMismatches(result) {
+  if (!result) return [];
+  if (Array.isArray(result.issues)) return result.issues;
+  if (Array.isArray(result.mismatches)) return result.mismatches;
+  if (typeof result.resultJson === 'string' && result.resultJson.length > 0) {
+    try {
+      const parsed = JSON.parse(result.resultJson);
+      if (Array.isArray(parsed)) {
+        return parsed.flatMap(ep => Array.isArray(ep.mismatches) ? ep.mismatches : []);
+      }
+    } catch { /* fall through */ }
+  }
+  return [];
+}
+
 /** Strip ANSI escape codes for length measurement */
 function stripAnsi(str) {
   return str.replace(/\[[0-9;]*m/g, '');
@@ -82,8 +102,8 @@ const publishProviderCommand = new Command('publish-provider')
   .requiredOption('--spec <path>', 'Path to provider spec file (YAML or JSON)')
   .requiredOption('--provider <name>', 'Provider service name')
   .requiredOption('--version <ver>', 'Provider version tag')
+  .requiredOption('--org <key>', 'Organization key')
   .option('--env <environment>', 'Environment label (e.g. staging, production)')
-  .option('--org <key>', 'Organization key')
   .option('--branch <branch>', 'Git branch name')
   .option('--json', 'Output raw JSON')
   .option('--server <url>', 'SpecShield server URL')
@@ -110,12 +130,12 @@ const publishProviderCommand = new Command('publish-provider')
 
     try {
       const result = await publishProviderSpec(opts.server, token, {
-        provider:    opts.provider,
-        version:     opts.version,
+        orgKey:       opts.org,
+        providerName: opts.provider,
+        version:      opts.version,
         specContent,
-        env:         opts.env    || null,
-        orgKey:      opts.org    || null,
-        branch:      opts.branch || null,
+        environment:  opts.env    || null,
+        branch:       opts.branch || null,
       });
       if (spinner) spinner.stop();
 
@@ -131,7 +151,11 @@ const publishProviderCommand = new Command('publish-provider')
       process.stdout.write(`  Provider    : ${chalk.white(opts.provider)}\n`);
       process.stdout.write(`  Version     : ${chalk.cyan(opts.version)}\n`);
       if (opts.env)        process.stdout.write(`  Environment : ${opts.env}\n`);
-      if (result.publishedAt) process.stdout.write(`  Published At: ${fmtDate(result.publishedAt)}\n`);
+      const publishedAt = result.createdAt || result.publishedAt;
+      if (publishedAt) process.stdout.write(`  Published At: ${fmtDate(publishedAt)}\n`);
+      if (typeof result.verificationsTriggered === 'number') {
+        process.stdout.write(`  Verifications triggered: ${chalk.cyan(result.verificationsTriggered)}\n`);
+      }
       process.stdout.write('\n');
     } catch (err) {
       if (spinner) spinner.fail('Publish failed');
@@ -148,7 +172,7 @@ const publishConsumerCommand = new Command('publish-consumer')
   .requiredOption('--consumer <name>', 'Consumer service name')
   .requiredOption('--provider <name>', 'Provider service name')
   .requiredOption('--version <ver>', 'Consumer version tag')
-  .option('--org <key>', 'Organization key')
+  .requiredOption('--org <key>', 'Organization key')
   .option('--format <fmt>', 'Contract format: OPENAPI | PACT', 'OPENAPI')
   .option('--json', 'Output raw JSON')
   .option('--server <url>', 'SpecShield server URL')
@@ -175,12 +199,12 @@ const publishConsumerCommand = new Command('publish-consumer')
 
     try {
       const result = await publishConsumerContract(opts.server, token, {
-        consumer:        opts.consumer,
-        provider:        opts.provider,
+        orgKey:          opts.org,
+        consumerName:    opts.consumer,
+        providerName:    opts.provider,
         version:         opts.version,
         contractContent,
-        orgKey:          opts.org    || null,
-        format:          opts.format || 'OPENAPI',
+        contractFormat:  opts.format || 'OPENAPI',
       });
       if (spinner) spinner.stop();
 
@@ -197,7 +221,11 @@ const publishConsumerCommand = new Command('publish-consumer')
       process.stdout.write(`  Provider    : ${chalk.white(opts.provider)}\n`);
       process.stdout.write(`  Version     : ${chalk.cyan(opts.version)}\n`);
       process.stdout.write(`  Format      : ${opts.format || 'OPENAPI'}\n`);
-      if (result.publishedAt) process.stdout.write(`  Published At: ${fmtDate(result.publishedAt)}\n`);
+      const consumerPublishedAt = result.createdAt || result.publishedAt;
+      if (consumerPublishedAt) process.stdout.write(`  Published At: ${fmtDate(consumerPublishedAt)}\n`);
+      if (typeof result.verificationsTriggered === 'number') {
+        process.stdout.write(`  Verifications triggered: ${chalk.cyan(result.verificationsTriggered)}\n`);
+      }
       process.stdout.write('\n');
       process.stdout.write(chalk.gray(`  ➜  Run: specshield bdct verify --consumer ${opts.consumer} --provider ${opts.provider}\n`));
       process.stdout.write('\n');
@@ -214,10 +242,10 @@ const verifyCommand = new Command('verify')
   .description('Verify consumer-provider contract compatibility')
   .requiredOption('--consumer <name>', 'Consumer service name')
   .requiredOption('--provider <name>', 'Provider service name')
-  .option('--consumer-version <ver>', 'Consumer version to verify')
-  .option('--provider-version <ver>', 'Provider version to verify against')
+  .requiredOption('--consumer-version <ver>', 'Consumer version to verify')
+  .requiredOption('--provider-version <ver>', 'Provider version to verify against')
+  .requiredOption('--org <key>', 'Organization key')
   .option('--env <environment>', 'Environment label')
-  .option('--org <key>', 'Organization key')
   .option('--json', 'Output raw JSON')
   .option('--server <url>', 'SpecShield server URL')
   .option('--api-token <token>', 'API token')
@@ -229,12 +257,12 @@ const verifyCommand = new Command('verify')
 
     try {
       const result = await verify(opts.server, token, {
-        consumer:        opts.consumer,
-        provider:        opts.provider,
-        consumerVersion: opts.consumerVersion || null,
-        providerVersion: opts.providerVersion || null,
-        env:             opts.env             || null,
-        orgKey:          opts.org             || null,
+        orgKey:          opts.org,
+        consumerName:    opts.consumer,
+        consumerVersion: opts.consumerVersion,
+        providerName:    opts.provider,
+        providerVersion: opts.providerVersion,
+        environment:     opts.env || null,
       });
       if (spinner) spinner.stop();
 
@@ -262,14 +290,26 @@ const verifyCommand = new Command('verify')
         process.stdout.write(`  Verified At     : ${fmtDate(result.verifiedAt || result.completedAt)}\n`);
       }
 
-      const issues = result.issues || result.mismatches || [];
+      // Backend returns resultJson as a JSON string of [{endpoint, status, mismatches:[...]}].
+      // Older shapes also accepted: top-level issues / mismatches arrays.
+      const issues = flattenMismatches(result);
       if (issues.length > 0) {
         process.stdout.write('\n');
         process.stdout.write(chalk.red.bold('  Issues') + '\n');
         process.stdout.write(hr() + '\n');
         for (const issue of issues) {
-          process.stdout.write(`  ${chalk.red('●')} ${chalk.bold(issue.type || issue.mismatchType || 'MISMATCH')} at ${chalk.gray(issue.path || '$')}\n`);
-          if (issue.message) process.stdout.write(`    ${chalk.gray(issue.message)}\n`);
+          const sev = (issue.severity || 'ERROR').toUpperCase();
+          const marker = sev === 'WARNING' ? chalk.yellow('⚠') : chalk.red('●');
+          const type = issue.type || issue.mismatchType || 'MISMATCH';
+          const loc  = issue.field || issue.path || issue.endpoint || '$';
+          process.stdout.write(`  ${marker} ${chalk.bold(type)} at ${chalk.gray(loc)}\n`);
+          if (issue.consumerExpects && issue.providerProvides) {
+            process.stdout.write(`    ${chalk.gray(`consumer: ${issue.consumerExpects}, provider: ${issue.providerProvides}`)}\n`);
+          } else if (issue.consumerExpects) {
+            process.stdout.write(`    ${chalk.gray(`expected: ${issue.consumerExpects}`)}\n`);
+          } else if (issue.message) {
+            process.stdout.write(`    ${chalk.gray(issue.message)}\n`);
+          }
         }
         process.stdout.write('\n');
       }
@@ -289,8 +329,8 @@ const canIDeployCommand = new Command('can-i-deploy')
   .description('Check if a service version is safe to deploy')
   .requiredOption('--service <name>', 'Service name (consumer or provider)')
   .requiredOption('--version <ver>', 'Service version to check')
+  .requiredOption('--org <key>', 'Organization key')
   .option('--env <environment>', 'Target environment (e.g. qa, staging, production)')
-  .option('--org <key>', 'Organization key')
   .option('--json', 'Output raw JSON')
   .option('--server <url>', 'SpecShield server URL')
   .option('--api-token <token>', 'API token')
@@ -302,10 +342,10 @@ const canIDeployCommand = new Command('can-i-deploy')
 
     try {
       const result = await canIDeploy(opts.server, token, {
+        org:     opts.org,
         service: opts.service,
         version: opts.version,
         env:     opts.env || null,
-        org:     opts.org || null,
       });
       if (spinner) spinner.stop();
 
@@ -360,7 +400,7 @@ const canIDeployCommand = new Command('can-i-deploy')
 
 const listCommand = new Command('list')
   .description('List BDCT verification history')
-  .option('--org <key>', 'Filter by organization key')
+  .requiredOption('--org <key>', 'Organization key')
   .option('--consumer <name>', 'Filter by consumer service name')
   .option('--provider <name>', 'Filter by provider service name')
   .option('--env <environment>', 'Filter by environment')
@@ -433,7 +473,7 @@ const listCommand = new Command('list')
 
 const matrixCommand = new Command('matrix')
   .description('Show ASCII compatibility matrix of consumers vs providers')
-  .option('--org <key>', 'Organization key')
+  .requiredOption('--org <key>', 'Organization key')
   .option('--env <environment>', 'Environment label')
   .option('--json', 'Output raw JSON')
   .option('--server <url>', 'SpecShield server URL')
@@ -456,7 +496,8 @@ const matrixCommand = new Command('matrix')
         return;
       }
 
-      // Expected matrix shape: { consumers: string[], providers: string[], cells: { [consumer]: { [provider]: string } } }
+      // Backend matrix shape: { consumers: string[], providers: string[],
+      //                        cells: { "<consumer>__<provider>": "<STATUS>" } }
       const consumers = matrix.consumers || [];
       const providers = matrix.providers || [];
       const cells     = matrix.cells     || {};
@@ -475,7 +516,7 @@ const matrixCommand = new Command('matrix')
       const headers = ['Consumer \\ Provider', ...providers];
       const rows = consumers.map(consumer => {
         const providerCells = providers.map(provider => {
-          const status = (cells[consumer] && cells[consumer][provider]) || 'UNKNOWN';
+          const status = cells[`${consumer}__${provider}`] || 'UNKNOWN';
           return compatBadge(status);
         });
         return [chalk.white(consumer), ...providerCells];
@@ -497,11 +538,8 @@ const matrixCommand = new Command('matrix')
 
 const listProvidersCommand = new Command('list-providers')
   .description('List published provider specs')
-  .option('--org <key>', 'Filter by organization key')
+  .requiredOption('--org <key>', 'Organization key')
   .option('--provider <name>', 'Filter by provider service name')
-  .option('--env <environment>', 'Filter by environment')
-  .option('--page <n>', 'Page number (0-based)', '0')
-  .option('--size <n>', 'Page size', '20')
   .option('--json', 'Output raw JSON')
   .option('--server <url>', 'SpecShield server URL')
   .option('--api-token <token>', 'API token')
@@ -515,9 +553,6 @@ const listProvidersCommand = new Command('list-providers')
       const page = await listProviderSpecs(opts.server, token, {
         org:      opts.org,
         provider: opts.provider,
-        env:      opts.env,
-        page:     parseInt(opts.page, 10) || 0,
-        size:     parseInt(opts.size, 10)  || 20,
       });
       if (spinner) spinner.stop();
 
@@ -543,11 +578,11 @@ const listProvidersCommand = new Command('list-providers')
         ['ID', 'Provider', 'Version', 'Environment', 'Branch', 'Published At'],
         items.map(s => [
           chalk.cyan(String(s.id ?? '—')),
-          s.provider || s.providerName || '—',
+          s.providerName || s.provider || '—',
           chalk.cyan(s.version || '—'),
-          s.env || s.environment || '—',
+          s.environment || s.env || '—',
           chalk.gray(s.branch || '—'),
-          fmtDate(s.publishedAt),
+          fmtDate(s.createdAt || s.publishedAt),
         ])
       );
 
@@ -566,11 +601,9 @@ const listProvidersCommand = new Command('list-providers')
 
 const listConsumersCommand = new Command('list-consumers')
   .description('List published consumer contracts')
-  .option('--org <key>', 'Filter by organization key')
+  .requiredOption('--org <key>', 'Organization key')
   .option('--consumer <name>', 'Filter by consumer service name')
   .option('--provider <name>', 'Filter by provider service name')
-  .option('--page <n>', 'Page number (0-based)', '0')
-  .option('--size <n>', 'Page size', '20')
   .option('--json', 'Output raw JSON')
   .option('--server <url>', 'SpecShield server URL')
   .option('--api-token <token>', 'API token')
@@ -585,8 +618,6 @@ const listConsumersCommand = new Command('list-consumers')
         org:      opts.org,
         consumer: opts.consumer,
         provider: opts.provider,
-        page:     parseInt(opts.page, 10) || 0,
-        size:     parseInt(opts.size, 10)  || 20,
       });
       if (spinner) spinner.stop();
 
@@ -612,11 +643,11 @@ const listConsumersCommand = new Command('list-consumers')
         ['ID', 'Consumer', 'Provider', 'Version', 'Format', 'Published At'],
         items.map(c => [
           chalk.cyan(String(c.id ?? '—')),
-          c.consumer || c.consumerName || '—',
-          c.provider || c.providerName || '—',
+          c.consumerName || c.consumer || '—',
+          c.providerName || c.provider || '—',
           chalk.cyan(c.version || '—'),
           c.contractFormat || c.format || '—',
-          fmtDate(c.publishedAt),
+          fmtDate(c.createdAt || c.publishedAt),
         ])
       );
 

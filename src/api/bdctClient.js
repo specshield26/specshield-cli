@@ -22,7 +22,10 @@ function apiError(err) {
     const data = err.response.data;
     const msg = (data && (data.message || data.error || data.title))
       || `HTTP ${err.response.status}`;
-    return new Error(`API error (${err.response.status}): ${msg}`);
+    const e = new Error(`API error (${err.response.status}): ${msg}`);
+    e.status = err.response.status;
+    e.responseData = data;
+    return e;
   }
   if (err.request) return new Error(`No response from server: ${err.message}`);
   return new Error(`Request failed: ${err.message}`);
@@ -51,11 +54,10 @@ async function verify(server, apiToken, payload) {
 
 async function listVerifications(server, apiToken, { org, consumer, provider, env, page = 0, size = 20 } = {}) {
   try {
-    const params = { page, size };
-    if (org)      params.orgKey = org;
-    if (consumer) params.consumer = consumer;
-    if (provider) params.provider = provider;
-    if (env)      params.env = env;
+    const params = { orgKey: org, page, size };
+    if (consumer) params.consumerName = consumer;
+    if (provider) params.providerName = provider;
+    if (env)      params.environment = env;
     const res = await buildClient(server, apiToken).get('/api/bdct/verifications', { params });
     return res.data;
   } catch (err) { throw apiError(err); }
@@ -63,41 +65,44 @@ async function listVerifications(server, apiToken, { org, consumer, provider, en
 
 async function canIDeploy(server, apiToken, { org, service, version: ver, env } = {}) {
   try {
-    const params = { service, version: ver };
-    if (org) params.orgKey = org;
-    if (env) params.env = env;
+    const params = { orgKey: org, service, version: ver };
+    if (env) params.environment = env;
     const res = await buildClient(server, apiToken).get('/api/bdct/can-i-deploy', { params });
     return res.data;
-  } catch (err) { throw apiError(err); }
+  } catch (err) {
+    // 409 = NOT DEPLOYABLE — valid result, not an error (backend signals via status)
+    if (err.response && err.response.status === 409 && err.response.data
+        && typeof err.response.data === 'object'
+        && Object.prototype.hasOwnProperty.call(err.response.data, 'deployable')) {
+      return err.response.data;
+    }
+    throw apiError(err);
+  }
 }
 
 async function getMatrix(server, apiToken, { org, env } = {}) {
   try {
-    const params = {};
-    if (org) params.orgKey = org;
-    if (env) params.env = env;
+    const params = { orgKey: org };
+    if (env) params.environment = env;
     const res = await buildClient(server, apiToken).get('/api/bdct/matrix', { params });
     return res.data;
   } catch (err) { throw apiError(err); }
 }
 
-async function listProviderSpecs(server, apiToken, { org, provider, env, page = 0, size = 20 } = {}) {
+async function listProviderSpecs(server, apiToken, { org, provider } = {}) {
   try {
-    const params = { page, size };
-    if (org)      params.orgKey = org;
-    if (provider) params.provider = provider;
-    if (env)      params.env = env;
+    const params = { orgKey: org };
+    if (provider) params.providerName = provider;
     const res = await buildClient(server, apiToken).get('/api/bdct/provider-specs', { params });
     return res.data;
   } catch (err) { throw apiError(err); }
 }
 
-async function listConsumerContracts(server, apiToken, { org, consumer, provider, page = 0, size = 20 } = {}) {
+async function listConsumerContracts(server, apiToken, { org, consumer, provider } = {}) {
   try {
-    const params = { page, size };
-    if (org)      params.orgKey = org;
-    if (consumer) params.consumer = consumer;
-    if (provider) params.provider = provider;
+    const params = { orgKey: org };
+    if (consumer) params.consumerName = consumer;
+    if (provider) params.providerName = provider;
     const res = await buildClient(server, apiToken).get('/api/bdct/consumer-contracts', { params });
     return res.data;
   } catch (err) { throw apiError(err); }

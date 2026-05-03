@@ -7,7 +7,7 @@
 
 ---
 
-> **OpenAPI Diff · API Breaking Change Detection · Swagger Diff · Consumer-Driven Contract Testing · Pact Alternative · can-i-deploy · Bi-Directional Contract Testing · GitHub PR Checks · CI/CD**
+> **OpenAPI Diff · API Breaking Change Detection · Swagger Diff · Bi-Directional Contract Testing · Pact Alternative · can-i-deploy · GitHub PR Checks · CI/CD**
 
 ---
 
@@ -57,7 +57,7 @@ No runtime surprise. No production incident. No 3am page.
 
 [![SpecShield Demo — API Breaking Change Detection & Contract Testing](https://img.youtube.com/vi/mugDyQQGqZw/maxresdefault.jpg)](https://www.youtube.com/watch?v=mugDyQQGqZw)
 
-> Watch: Catching a breaking API change before it hits production — compare specs, publish contracts, verify providers, and gate deployments with `can-i-deploy`.
+> Watch: Catching a breaking API change before it hits production — compare specs, publish provider/consumer specs via BDCT, and gate deployments with `can-i-deploy`.
 
 **CLI preview:**
 
@@ -141,8 +141,6 @@ That's it. Works with any OpenAPI 3.x YAML or JSON spec.
 | JSON / human output | ✅ | ✅ | ✅ |
 | Fail CI on breaking change | ✅ | ✅ | ✅ |
 | **Compare history & dashboard** | ❌ | ✅ | ✅ |
-| **CDCT contract testing registry** | ❌ | ✅ | ✅ |
-| **CDCT can-i-deploy gating** | ❌ | ✅ | ✅ |
 | **GitHub App PR checks** | ❌ | ✅ | ✅ |
 | **BDCT bi-directional contracts** | ❌ | ❌ | ✅ |
 | **BDCT can-i-deploy gating** | ❌ | ❌ | ✅ |
@@ -160,8 +158,9 @@ That's it. Works with any OpenAPI 3.x YAML or JSON spec.
 > Without SpecShield, this would have reached staging, broken checkout for every user,
 > and triggered an incident at 2am.
 >
-> With SpecShield, the provider's CI ran `specshield contracts verify` against the
-> consumer's published contract. The mismatch was caught immediately:
+> With SpecShield, the provider's CI published the new spec via
+> `specshield bdct publish-provider`. The compatibility engine ran against
+> `checkout-ui`'s published contract and the mismatch was caught immediately:
 >
 > ```
 > ● MISSING_FIELD at $.status
@@ -195,7 +194,6 @@ Track API drift over time across your entire platform. Know what changed, when, 
 |---|---|---|---|
 | OpenAPI / Swagger native | ✅ | ❌ (code-level) | ✅ |
 | No broker required | ✅ | ❌ (needs Pact Broker) | ✅ |
-| Consumer-driven contract testing | ✅ | ✅ | ❌ |
 | **Bi-directional contract testing** | ✅ | ✅ (Pactflow paid) | ❌ |
 | Breaking change detection | ✅ | ❌ | ✅ |
 | can-i-deploy gating | ✅ | ✅ (via broker) | ❌ |
@@ -212,7 +210,7 @@ Track API drift over time across your entire platform. Know what changed, when, 
 
 | Plan | Price | What's included |
 |---|---|---|
-| **Free** | $0 forever | Local compare (unlimited) · Compare history & dashboard · CDCT contracts & can-i-deploy · GitHub App PR checks |
+| **Free** | $0 forever | Local compare (unlimited) · Compare history & dashboard · GitHub App PR checks |
 | **Pro** | Coming soon | Everything in Free + BDCT bi-directional contracts · BDCT can-i-deploy & matrix · Team collaboration · Advanced reporting · Priority support |
 
 No credit card ever required for the free plan.
@@ -351,136 +349,15 @@ github:
 
 ---
 
-## Contract Testing (CDCT)
-
-Consumer-driven contract testing for microservices — without a broker.
-
-**How it works:**
-
-1. Consumer team publishes a contract (what they expect from the provider)
-2. Provider team verifies their service satisfies it by actually calling it
-3. `can-i-deploy` gates the deployment based on verification results
-
-### Contract File Format
-
-```json
-{
-  "consumer": { "name": "checkout-ui", "version": "2.0.0" },
-  "provider": { "name": "payment-service" },
-  "orgKey": "acme-store",
-  "contractName": "create-payment",
-  "contractType": "HTTP",
-  "interactions": [
-    {
-      "description": "checkout-ui creates a payment",
-      "request": {
-        "method": "POST",
-        "path": "/payments",
-        "headers": { "Content-Type": "application/json" },
-        "body": { "orderId": "ORD-123", "amount": 1299, "currency": "INR" }
-      },
-      "expectedResponse": {
-        "status": 201,
-        "headers": { "Content-Type": "application/json" },
-        "body": { "paymentId": "PAY-123", "status": "CREATED" }
-      }
-    }
-  ]
-}
-```
-
-### Publish a Contract
-
-```bash
-specshield contracts publish \
-  --file ./contracts/create-payment.json \
-  --org acme-store \
-  --consumer-version 2.0.0 \
-  --tag main
-```
-
-### Verify a Contract
-
-```bash
-specshield contracts verify \
-  --contract-id 42 \
-  --base-url http://localhost:8080 \
-  --provider-version v2.1.0 \
-  --env staging
-```
-
-Pass output:
-```
-  ✔  Verification PASSED  (1/1 interactions)
-```
-
-Fail output:
-```
-  ✖  Verification FAILED  (0/1 interactions passed, 1 failed)
-
-  Mismatches
-  ● [create payment] MISSING_FIELD at $.status
-    expected: "CREATED"  →  actual: null
-```
-
-### Can I Deploy?
-
-```bash
-specshield contracts can-i-deploy \
-  --provider payment-service \
-  --version v2.1.0 \
-  --env staging
-```
-
-```
-  ✔  PASS: payment-service v2.1.0 is deployable in staging
-```
-```
-  ✖  FAIL: payment-service v2.1.0 is NOT deployable in staging
-```
-
-Exit codes: `0` = deployable · `1` = blocked · `2` = error
-
-### List and Inspect Contracts
-
-```bash
-specshield contracts list --provider payment-service
-specshield contracts latest --consumer checkout-ui --provider payment-service --json
-specshield contracts history --contract-id 42
-```
-
-### Full CDCT Workflow
-
-```bash
-# 1. Consumer publishes contract
-specshield contracts publish --file ./contracts/create-payment.json --org acme-store
-
-# 2. Provider verifies it
-specshield contracts verify --contract-id 42 --base-url http://localhost:8080 --provider-version v2.1.0
-
-# 3. Gate the deployment
-specshield contracts can-i-deploy --provider payment-service --version v2.1.0
-```
-
----
-
 ## Bi-Directional Contract Testing (BDCT)
 
 **Spec-to-spec contract testing — no running services required.**
 
-BDCT is the static alternative to CDCT. Instead of running the provider server, both sides publish their OpenAPI specs. SpecShield compares them and flags mismatches immediately — ideal for teams that don't run services locally or in CI.
+Both sides publish their OpenAPI specs. SpecShield compares them and flags
+mismatches immediately — ideal for teams that don't run services locally or in
+CI. Pact JSON consumer contracts are also accepted and auto-converted.
 
 > BDCT requires a **Pro plan**. [Upgrade at specshield.io/upgrade](https://specshield.io/upgrade)
-
-**CDCT vs BDCT:**
-
-| | CDCT | BDCT |
-|---|---|---|
-| How verification works | Replay requests against a live server | Compare OpenAPI specs statically |
-| Provider needs to run | Yes | No |
-| Feedback speed | After deploy to test env | Immediately on spec publish |
-| Pact JSON contracts | Supported | Supported (auto-converted) |
-| Best for | Runtime correctness | Early spec-level safety |
 
 ### How BDCT Works
 
@@ -687,7 +564,7 @@ specshield bdct list-consumers --org acme-store --provider payment-service
 ### List Verifications
 
 ```bash
-specshield bdct list-verifications \
+specshield bdct list \
   --org acme-store \
   --provider payment-service \
   --env production \
@@ -778,73 +655,6 @@ jobs:
         run: git show origin/main:api/openapi.yaml > /tmp/base.yaml
       - name: Compare specs
         run: specshield compare /tmp/base.yaml api/openapi.yaml --fail-on-breaking
-```
-
-### On Push — Publish consumer contract (CDCT)
-
-```yaml
-name: Publish Contract
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'contracts/**'
-
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm install -g specshield
-      - name: Publish contract
-        env:
-          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
-        run: |
-          specshield contracts publish \
-            --file ./contracts/create-payment.json \
-            --org acme-store \
-            --tag ${{ github.ref_name }}
-```
-
-### On Push — Verify provider + gate deployment (CDCT)
-
-```yaml
-name: Contract Verification
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm install -g specshield
-      - name: Verify contract
-        env:
-          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
-        run: |
-          specshield contracts verify \
-            --contract-id ${{ vars.CONTRACT_ID }} \
-            --base-url http://localhost:8080 \
-            --provider-version ${{ github.sha }} \
-            --env staging
-      - name: Can I deploy?
-        env:
-          SPECSHIELD_API_KEY: ${{ secrets.SPECSHIELD_API_KEY }}
-        run: |
-          specshield contracts can-i-deploy \
-            --provider payment-service \
-            --version ${{ github.sha }} \
-            --env staging
 ```
 
 ### On Push — Publish provider spec (BDCT)
@@ -981,7 +791,7 @@ specshield bdct <subcommand> [options]
 | `matrix` | View compatibility matrix across all pairs |
 | `list-providers` | List published provider specs |
 | `list-consumers` | List published consumer contracts |
-| `list-verifications` | List verification history |
+| `list` | List verification history |
 
 All `bdct` subcommands support `--json` for machine-readable output.
 
