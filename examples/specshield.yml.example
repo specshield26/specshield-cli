@@ -1,0 +1,42 @@
+# Example .specshield.yml — produced by `specshield init`
+#
+# Copy this file to your project root as `.specshield.yml`, edit the values,
+# and every `specshield ...` invocation will pick it up automatically.
+# Safe to commit. Never put your API key in here — keep it in
+# ~/.specshield/config.json or set SPECSHIELD_API_KEY in CI.
+
+schemaVersion: 1
+
+# Local compare defaults — used by `specshield compare`.
+failOnBreaking: true
+severity: error            # info | warning | error
+
+# BDCT defaults — used by every `specshield bdct ...` command.
+bdct:
+  # Required for every BDCT subcommand.
+  org: your-org-key
+
+  # Optional; default is https://specshield.io.
+  # server: https://specshield.io
+
+  # Default environment for can-i-deploy / publish-provider.
+  environment: staging
+
+  # If this project publishes a provider OpenAPI spec:
+  provider:
+    name: payment-service
+    spec: api/openapi.yaml         # path is relative to this file
+    # branch: main                  # optional; informational tag stored on each spec publish
+
+  # If this project publishes a consumer contract:
+  # consumer:
+  #   name: checkout-ui
+  #   provider: payment-service
+  #   contract: contracts/payment-service.yaml
+  #   format: OPENAPI               # OPENAPI | PACT
+
+# Defaults consumed by the SpecShield GitHub App + the bdct-action.
+github:
+  specPath: api/openapi.yaml
+  failOnBreaking: true
+  commentOnPr: true

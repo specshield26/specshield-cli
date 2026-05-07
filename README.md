@@ -117,6 +117,26 @@ specshield compare base.yaml target.yaml --fail-on-breaking
 
 That's it. Works with any OpenAPI 3.x YAML or JSON spec.
 
+**For BDCT**, run the wizard once and never re-type the same flags again:
+
+```bash
+specshield init
+```
+
+It autodetects your OpenAPI spec, your service name (from `package.json` /
+`pyproject.toml` / `pom.xml` / `go.mod`), your git branch, and your
+default environment, asks you a few questions, and writes a
+**`.specshield.yml`** at the project root. Every subsequent
+`specshield bdct ...` invocation reads this file, so your CI commands
+collapse to:
+
+```bash
+specshield bdct publish-provider --version $GITHUB_SHA
+specshield bdct can-i-deploy --version $GITHUB_SHA
+```
+
+See [§ specshield init](#specshield-init--first-run-setup-wizard) below.
+
 ---
 
 ## 🚀 Create Your Free Account
@@ -346,6 +366,83 @@ github:
 - The spec file must exist on both the base branch and the PR branch
 - Supported formats: OpenAPI 3.x YAML or JSON
 - The GitHub App needs `pull_requests: write` and `checks: write` permissions (granted during install)
+
+---
+
+## `specshield init` — first-run setup wizard
+
+Run once at the root of your project. The wizard:
+
+1. Detects your OpenAPI spec (looks under `api/`, `spec/`, `docs/`, repo root).
+2. Detects your service name (`package.json`, `pyproject.toml`, `pom.xml`, `go.mod`, `Cargo.toml`, or directory name).
+3. Detects your git branch and suggests `production` for `main`/`master`, `staging` otherwise.
+4. Asks whether this project is a provider, a consumer, or both.
+5. Asks for your org key (autocompletes from your account if you're already signed in).
+6. Validates / stores your API key.
+7. Writes **`.specshield.yml`** and, optionally, a starter **`.github/workflows/specshield-bdct.yml`** that uses [`specshield26/bdct-action@v1`](https://github.com/marketplace/actions/specshield-bdct).
+
+```bash
+specshield init
+```
+
+### Example `.specshield.yml`
+
+```yaml
+schemaVersion: 1
+
+failOnBreaking: true
+severity: error
+
+bdct:
+  org: acme-pay
+  environment: staging
+
+  provider:
+    name: payment-service
+    spec: api/openapi.yaml
+
+  # consumer (optional — present when --kind=consumer or --kind=both):
+  # consumer:
+  #   name: checkout-ui
+  #   provider: payment-service
+  #   contract: contracts/payment-service.yaml
+  #   format: OPENAPI
+
+github:
+  specPath: api/openapi.yaml
+  failOnBreaking: true
+  commentOnPr: true
+```
+
+CLI flags **always** override this file. Paths in the file are resolved
+relative to the file's own directory, so you can run `specshield bdct ...`
+from any subdirectory of your project.
+
+### Non-interactive (scriptable) mode
+
+```bash
+specshield init --no-interactive \
+  --kind     provider \
+  --org      acme-pay \
+  --provider payment-service \
+  --spec     api/openapi.yaml \
+  --env      staging \
+  --write-workflow
+```
+
+### Other useful flags
+
+| Flag | Purpose |
+| --- | --- |
+| `--print` | Detect everything, print the proposed YAML, write nothing. Good for `--dry-run` review in CI. |
+| `--force` | Skip the overwrite-confirmation if `.specshield.yml` already exists. |
+| `--server <url>` | Use a non-default SpecShield endpoint (self-hosted / staging). |
+| `--write-workflow` | Also write a starter GitHub Actions workflow under `.github/workflows/`. |
+
+> **What is _not_ written into `.specshield.yml`:** your API key. It is
+> stored in `~/.specshield/config.json` (set by `specshield login`) or
+> read from `SPECSHIELD_API_KEY` in CI. The project file is meant to be
+> committed; never commit a secret into it.
 
 ---
 

@@ -3,6 +3,7 @@
 const { Command } = require('commander');
 const { version } = require('../package.json');
 const compareCommand = require('./commands/compare');
+const initCommand = require('./commands/init');
 const loginCommand = require('./commands/login');
 const logoutCommand = require('./commands/logout');
 const bdctCommand = require('./commands/bdct');
@@ -19,6 +20,7 @@ program
   .enablePositionalOptions();
 
 program.addCommand(compareCommand);
+program.addCommand(initCommand);
 program.addCommand(loginCommand);
 program.addCommand(logoutCommand);
 program.addCommand(bdctCommand);

@@ -7,6 +7,7 @@ const path = require('path');
 const fsExtra = require('fs-extra');
 const logger = require('../utils/logger');
 const { getStoredApiKey } = require('../config/localConfig');
+const { applyBdctDefaults } = require('../core/projectConfig');
 const {
   publishProviderSpec,
   publishConsumerContract,
@@ -29,6 +30,24 @@ function requireToken(token) {
     logger.error('No API token found. Pass --api-token, set SPECSHIELD_API_KEY, or run: specshield login --api-key <KEY>');
     process.exit(2);
   }
+}
+
+/**
+ * Fill missing CLI options from `.specshield.yml` if one is present, then
+ * verify every required field for `command` is set. Exits 2 with a friendly
+ * message if anything is missing.
+ */
+function withProjectDefaults(opts, command) {
+  try {
+    applyBdctDefaults(opts, command);
+  } catch (err) {
+    if (err.code === 'MISSING_REQUIRED_OPTIONS') {
+      logger.error(err.message);
+      process.exit(2);
+    }
+    throw err;
+  }
+  return opts;
 }
 
 function fmtDate(iso) {
@@ -99,16 +118,17 @@ function printTable(headers, rows) {
 
 const publishProviderCommand = new Command('publish-provider')
   .description('Publish a provider OpenAPI spec to the BDCT registry')
-  .requiredOption('--spec <path>', 'Path to provider spec file (YAML or JSON)')
-  .requiredOption('--provider <name>', 'Provider service name')
-  .requiredOption('--version <ver>', 'Provider version tag')
-  .requiredOption('--org <key>', 'Organization key')
+  .option('--spec <path>',     'Path to provider spec file (YAML or JSON)')
+  .option('--provider <name>', 'Provider service name')
+  .option('--version <ver>',   'Provider version tag')
+  .option('--org <key>',       'Organization key')
   .option('--env <environment>', 'Environment label (e.g. staging, production)')
   .option('--branch <branch>', 'Git branch name')
-  .option('--json', 'Output raw JSON')
-  .option('--server <url>', 'SpecShield server URL')
+  .option('--json',            'Output raw JSON')
+  .option('--server <url>',    'SpecShield server URL')
   .option('--api-token <token>', 'API token (overrides env / stored config)')
   .action(async (opts) => {
+    withProjectDefaults(opts, 'publish-provider');
     const token = await resolveApiToken(opts);
     requireToken(token);
 
@@ -168,16 +188,17 @@ const publishProviderCommand = new Command('publish-provider')
 
 const publishConsumerCommand = new Command('publish-consumer')
   .description('Publish a consumer contract to the BDCT registry')
-  .requiredOption('--contract <path>', 'Path to consumer contract file (OpenAPI YAML/JSON or Pact JSON)')
-  .requiredOption('--consumer <name>', 'Consumer service name')
-  .requiredOption('--provider <name>', 'Provider service name')
-  .requiredOption('--version <ver>', 'Consumer version tag')
-  .requiredOption('--org <key>', 'Organization key')
-  .option('--format <fmt>', 'Contract format: OPENAPI | PACT', 'OPENAPI')
-  .option('--json', 'Output raw JSON')
-  .option('--server <url>', 'SpecShield server URL')
+  .option('--contract <path>', 'Path to consumer contract file (OpenAPI YAML/JSON or Pact JSON)')
+  .option('--consumer <name>', 'Consumer service name')
+  .option('--provider <name>', 'Provider service name')
+  .option('--version <ver>',   'Consumer version tag')
+  .option('--org <key>',       'Organization key')
+  .option('--format <fmt>',    'Contract format: OPENAPI | PACT', 'OPENAPI')
+  .option('--json',            'Output raw JSON')
+  .option('--server <url>',    'SpecShield server URL')
   .option('--api-token <token>', 'API token (overrides env / stored config)')
   .action(async (opts) => {
+    withProjectDefaults(opts, 'publish-consumer');
     const token = await resolveApiToken(opts);
     requireToken(token);
 
@@ -240,16 +261,17 @@ const publishConsumerCommand = new Command('publish-consumer')
 
 const verifyCommand = new Command('verify')
   .description('Verify consumer-provider contract compatibility')
-  .requiredOption('--consumer <name>', 'Consumer service name')
-  .requiredOption('--provider <name>', 'Provider service name')
-  .requiredOption('--consumer-version <ver>', 'Consumer version to verify')
-  .requiredOption('--provider-version <ver>', 'Provider version to verify against')
-  .requiredOption('--org <key>', 'Organization key')
-  .option('--env <environment>', 'Environment label')
-  .option('--json', 'Output raw JSON')
-  .option('--server <url>', 'SpecShield server URL')
-  .option('--api-token <token>', 'API token')
+  .option('--consumer <name>',         'Consumer service name')
+  .option('--provider <name>',         'Provider service name')
+  .option('--consumer-version <ver>',  'Consumer version to verify')
+  .option('--provider-version <ver>',  'Provider version to verify against')
+  .option('--org <key>',               'Organization key')
+  .option('--env <environment>',       'Environment label')
+  .option('--json',                    'Output raw JSON')
+  .option('--server <url>',            'SpecShield server URL')
+  .option('--api-token <token>',       'API token')
   .action(async (opts) => {
+    withProjectDefaults(opts, 'verify');
     const token = await resolveApiToken(opts);
     requireToken(token);
 
@@ -266,13 +288,13 @@ const verifyCommand = new Command('verify')
       });
       if (spinner) spinner.stop();
 
-      if (opts.json) {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-        return;
-      }
-
       const status  = String(result.status || result.result || '').toUpperCase();
       const success = status === 'COMPATIBLE';
+
+      if (opts.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+        process.exit(success ? 0 : 1);
+      }
 
       process.stdout.write('\n');
       if (success) {
@@ -327,14 +349,15 @@ const verifyCommand = new Command('verify')
 
 const canIDeployCommand = new Command('can-i-deploy')
   .description('Check if a service version is safe to deploy')
-  .requiredOption('--service <name>', 'Service name (consumer or provider)')
-  .requiredOption('--version <ver>', 'Service version to check')
-  .requiredOption('--org <key>', 'Organization key')
+  .option('--service <name>',    'Service name (consumer or provider)')
+  .option('--version <ver>',     'Service version to check')
+  .option('--org <key>',         'Organization key')
   .option('--env <environment>', 'Target environment (e.g. qa, staging, production)')
-  .option('--json', 'Output raw JSON')
-  .option('--server <url>', 'SpecShield server URL')
+  .option('--json',              'Output raw JSON')
+  .option('--server <url>',      'SpecShield server URL')
   .option('--api-token <token>', 'API token')
   .action(async (opts) => {
+    withProjectDefaults(opts, 'can-i-deploy');
     const token = await resolveApiToken(opts);
     requireToken(token);
 
@@ -349,13 +372,13 @@ const canIDeployCommand = new Command('can-i-deploy')
       });
       if (spinner) spinner.stop();
 
-      if (opts.json) {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-        return;
-      }
-
       const deployable = result.deployable ?? result.allowed ?? false;
       const envLabel   = opts.env ? ` in ${opts.env}` : '';
+
+      if (opts.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+        process.exit(deployable ? 0 : 1);
+      }
 
       process.stdout.write('\n');
       if (deployable) {
@@ -400,7 +423,7 @@ const canIDeployCommand = new Command('can-i-deploy')
 
 const listCommand = new Command('list')
   .description('List BDCT verification history')
-  .requiredOption('--org <key>', 'Organization key')
+  .option('--org <key>', 'Organization key')
   .option('--consumer <name>', 'Filter by consumer service name')
   .option('--provider <name>', 'Filter by provider service name')
   .option('--env <environment>', 'Filter by environment')
@@ -410,6 +433,7 @@ const listCommand = new Command('list')
   .option('--server <url>', 'SpecShield server URL')
   .option('--api-token <token>', 'API token')
   .action(async (opts) => {
+    withProjectDefaults(opts, 'list');
     const token = await resolveApiToken(opts);
     requireToken(token);
 
@@ -473,12 +497,13 @@ const listCommand = new Command('list')
 
 const matrixCommand = new Command('matrix')
   .description('Show ASCII compatibility matrix of consumers vs providers')
-  .requiredOption('--org <key>', 'Organization key')
+  .option('--org <key>', 'Organization key')
   .option('--env <environment>', 'Environment label')
   .option('--json', 'Output raw JSON')
   .option('--server <url>', 'SpecShield server URL')
   .option('--api-token <token>', 'API token')
   .action(async (opts) => {
+    withProjectDefaults(opts, 'matrix');
     const token = await resolveApiToken(opts);
     requireToken(token);
 
@@ -538,12 +563,13 @@ const matrixCommand = new Command('matrix')
 
 const listProvidersCommand = new Command('list-providers')
   .description('List published provider specs')
-  .requiredOption('--org <key>', 'Organization key')
+  .option('--org <key>',       'Organization key')
   .option('--provider <name>', 'Filter by provider service name')
-  .option('--json', 'Output raw JSON')
-  .option('--server <url>', 'SpecShield server URL')
+  .option('--json',            'Output raw JSON')
+  .option('--server <url>',    'SpecShield server URL')
   .option('--api-token <token>', 'API token')
   .action(async (opts) => {
+    withProjectDefaults(opts, 'list-providers');
     const token = await resolveApiToken(opts);
     requireToken(token);
 
@@ -601,13 +627,14 @@ const listProvidersCommand = new Command('list-providers')
 
 const listConsumersCommand = new Command('list-consumers')
   .description('List published consumer contracts')
-  .requiredOption('--org <key>', 'Organization key')
+  .option('--org <key>',       'Organization key')
   .option('--consumer <name>', 'Filter by consumer service name')
   .option('--provider <name>', 'Filter by provider service name')
-  .option('--json', 'Output raw JSON')
-  .option('--server <url>', 'SpecShield server URL')
+  .option('--json',            'Output raw JSON')
+  .option('--server <url>',    'SpecShield server URL')
   .option('--api-token <token>', 'API token')
   .action(async (opts) => {
+    withProjectDefaults(opts, 'list-consumers');
     const token = await resolveApiToken(opts);
     requireToken(token);
 
