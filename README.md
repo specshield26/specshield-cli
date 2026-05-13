@@ -268,7 +268,16 @@ Done. Your token is stored in `~/.specshield/config.json` — no need to pass it
 export SPECSHIELD_API_KEY=ss_your_token_here
 ```
 
-Token resolution order: `--api-key flag` → `SPECSHIELD_API_KEY` env var → stored config → `.specshield.yml`
+This single env var works for every command — `compare`, `login`, and every
+`bdct` subcommand all read it.
+
+Token resolution order:
+- `compare` / `login`: `--api-key` flag → `SPECSHIELD_API_KEY` env var → stored config → `.specshield.yml`
+- `bdct ...` subcommands: `--api-token` flag → `SPECSHIELD_API_KEY` env var → stored config
+
+> **Why two flag names?** `compare` and `login` were built first and used
+> `--api-key`. The newer `bdct` commands use `--api-token` to keep the word
+> "key" reserved for the stored config concept. The env var unifies both.
 
 ---
 
@@ -421,6 +430,7 @@ from any subdirectory of your project.
 ### Non-interactive (scriptable) mode
 
 ```bash
+# Provider-only project
 specshield init --no-interactive \
   --kind     provider \
   --org      acme-pay \
@@ -428,16 +438,36 @@ specshield init --no-interactive \
   --spec     api/openapi.yaml \
   --env      staging \
   --write-workflow
+
+# Consumer-only project
+specshield init --no-interactive \
+  --kind              consumer \
+  --org               acme-pay \
+  --consumer          checkout-ui \
+  --consumer-provider payment-service \
+  --contract          contracts/payment-service.yaml \
+  --format            OPENAPI \
+  --env               staging
 ```
 
-### Other useful flags
+### All `init` flags
 
 | Flag | Purpose |
 | --- | --- |
-| `--print` | Detect everything, print the proposed YAML, write nothing. Good for `--dry-run` review in CI. |
+| `--no-interactive` | Run without prompts; all required fields must come from flags or `package.json`/git autodetection. |
+| `--print` | Detect everything, print the proposed YAML to stdout, write nothing. Good for `--dry-run` review in CI. |
 | `--force` | Skip the overwrite-confirmation if `.specshield.yml` already exists. |
-| `--server <url>` | Use a non-default SpecShield endpoint (self-hosted / staging). |
-| `--write-workflow` | Also write a starter GitHub Actions workflow under `.github/workflows/`. |
+| `--server <url>` | Use a non-default SpecShield endpoint (self-hosted / staging). Default: `https://specshield.io`. |
+| `--kind <kind>` | `provider`, `consumer`, `both`, or `skip`. Required in `--no-interactive`. |
+| `--org <key>` | Organization key. |
+| `--provider <name>` | Provider service name (used when `--kind=provider|both`). |
+| `--spec <path>` | Path to the provider OpenAPI spec. |
+| `--consumer <name>` | Consumer service name (used when `--kind=consumer|both`). |
+| `--consumer-provider <name>` | The provider this consumer talks to (used when `--kind=consumer|both`). |
+| `--contract <path>` | Path to the consumer contract (OpenAPI or Pact JSON). |
+| `--format <fmt>` | Consumer contract format: `OPENAPI` (default) or `PACT`. |
+| `--env <environment>` | Default environment for BDCT operations. |
+| `--write-workflow` | Also write a starter GitHub Actions workflow under `.github/workflows/specshield-bdct.yml`. |
 
 > **What is _not_ written into `.specshield.yml`:** your API key. It is
 > stored in `~/.specshield/config.json` (set by `specshield login`) or
@@ -471,16 +501,24 @@ specshield bdct publish-provider \
   --provider payment-service \
   --version v2.1.0 \
   --spec ./api/openapi.yaml \
-  --env production
+  --env production \
+  --branch main
 ```
 
 ```
-  ✔  Provider spec published
-     Provider  : payment-service
-     Version   : v2.1.0
-     Env       : production
-     Auto-verifications triggered: 3
+  ✔  Provider Spec Published
+  ─────────────────────────────────────────────────────
+  ID          : 1842
+  Provider    : payment-service
+  Version     : v2.1.0
+  Environment : production
+  Published At: 2026-05-13 14:30:12
+  Verifications triggered: 3
 ```
+
+`--branch` is optional — when present it's stamped on the published spec so you
+can correlate a spec version with the git branch it came from in
+`bdct list-providers`.
 
 ### Publish a Consumer Contract
 
@@ -522,19 +560,30 @@ specshield bdct publish-consumer \
   --consumer checkout-ui \
   --provider payment-service \
   --version 2.0.0 \
-  --contract ./contracts/checkout-ui-payment.yaml
+  --contract ./contracts/checkout-ui-payment.yaml \
+  --format OPENAPI
 ```
 
 ```
-  ✔  Consumer contract published
-     Consumer    : checkout-ui @ 2.0.0
-     Provider    : payment-service
-     Compatibility: COMPATIBLE
+  ✔  Consumer Contract Published
+  ─────────────────────────────────────────────────────
+  ID          : 942
+  Consumer    : checkout-ui
+  Provider    : payment-service
+  Version     : 2.0.0
+  Format      : OPENAPI
+  Published At: 2026-05-13 14:31:05
+  Verifications triggered: 1
+
+  ➜  Run: specshield bdct verify --consumer checkout-ui --provider payment-service
 ```
 
-If the provider spec is already published, compatibility is checked immediately.
+If the provider spec is already published, compatibility is verified
+automatically — the "Verifications triggered" count reflects that.
 
-**Pact JSON contracts are also accepted** — SpecShield auto-converts them:
+**Pact JSON contracts are also supported** — pass `--format PACT` and point
+`--contract` at a Pact file. The backend stores the format and runs the same
+compatibility engine against your provider's OpenAPI spec:
 
 ```bash
 specshield bdct publish-consumer \
@@ -542,8 +591,11 @@ specshield bdct publish-consumer \
   --consumer checkout-ui \
   --provider payment-service \
   --version 2.0.0 \
-  --contract ./pacts/checkout-ui-payment-service.json
+  --contract ./pacts/checkout-ui-payment-service.json \
+  --format PACT
 ```
+
+`--format` defaults to `OPENAPI` if omitted.
 
 ### Verify Compatibility
 
@@ -596,18 +648,36 @@ specshield bdct can-i-deploy \
   --env production
 ```
 
-```
-  ✔  DEPLOYABLE
-
-  payment-service v2.1.0 is COMPATIBLE with all 3 consumer(s)
-```
+Deployable output:
 
 ```
-  ✖  NOT DEPLOYABLE
+  ✔  PASS: payment-service v2.1.0 is deployable in production
+  ─────────────────────────────────────────────────────
 
-  payment-service v2.1.0 is INCOMPATIBLE with:
-    checkout-ui@2.0.0 (INCOMPATIBLE)
-    mobile-app@1.5.0  (INCOMPATIBLE)
+  Consumer Verifications
+
+  Consumer     Version  Status      Verified At
+  ───────────  ───────  ──────────  ───────────────
+  checkout-ui  2.0.0    COMPATIBLE  2026-05-13 14:32
+  mobile-app   1.5.0    COMPATIBLE  2026-05-13 14:32
+  partner-sdk  3.2.1    COMPATIBLE  2026-05-13 14:32
+```
+
+Blocked output:
+
+```
+  ✖  FAIL: payment-service v2.1.0 is NOT deployable in production
+  ─────────────────────────────────────────────────────
+
+  Consumer Verifications
+
+  Consumer     Version  Status        Verified At
+  ───────────  ───────  ────────────  ───────────────
+  checkout-ui  2.0.0    INCOMPATIBLE  2026-05-13 14:32
+  mobile-app   1.5.0    INCOMPATIBLE  2026-05-13 14:32
+
+  ➜  Run: specshield bdct verify --consumer <NAME> --provider payment-service
+  ➜  to identify and resolve incompatibilities
 ```
 
 Exit codes: `0` = deployable · `1` = blocked · `2` = error
@@ -621,12 +691,17 @@ specshield bdct matrix --org acme-store --env production
 ```
 
 ```
-  Compatibility Matrix  (env: production)
+  BDCT Compatibility Matrix
+  Environment: production
+  ─────────────────────────────────────────────────────
 
-                    payment-service  order-service
-  checkout-ui       COMPATIBLE       COMPATIBLE
-  mobile-app        INCOMPATIBLE     COMPATIBLE
-  partner-sdk       COMPATIBLE       UNKNOWN
+  Consumer \ Provider  payment-service  order-service
+  ───────────────────  ───────────────  ─────────────
+  checkout-ui          COMPATIBLE       COMPATIBLE
+  mobile-app           INCOMPATIBLE     COMPATIBLE
+  partner-sdk          COMPATIBLE       UNKNOWN
+
+  ■ COMPATIBLE  ■ INCOMPATIBLE  ■ UNKNOWN
 ```
 
 ### List Provider Specs
@@ -640,11 +715,15 @@ specshield bdct list-providers --org acme-store --provider payment-service
 ```
 
 ```
-  Provider Specs
+  Published Provider Specs
+  ─────────────────────────────────────────────────────
+  Showing 3 of 3 specs
 
-  payment-service  v2.1.0   production   2025-05-01
-  payment-service  v2.0.0   staging      2025-04-20
-  order-service    v1.3.0   production   2025-04-28
+  ID    Provider         Version  Environment  Branch  Published At
+  ────  ───────────────  ───────  ───────────  ──────  ───────────────
+  1842  payment-service  v2.1.0   production   main    2026-05-13 14:30
+  1799  payment-service  v2.0.0   staging      main    2026-04-20 09:11
+  1772  order-service    v1.3.0   production   main    2026-04-28 11:02
 ```
 
 ### List Consumer Contracts
@@ -670,11 +749,14 @@ specshield bdct list \
 ```
 
 ```
-  BDCT Verifications
+  BDCT Verification History
+  ─────────────────────────────────────────────────────
+  Showing 2 of 2 verifications
 
-  Consumer     Consumer Ver  Provider          Provider Ver  Env         Status        Verified At
-  checkout-ui  2.0.0         payment-service   v2.1.0        production  COMPATIBLE    2025-05-01 14:30
-  mobile-app   1.5.0         payment-service   v2.1.0        production  INCOMPATIBLE  2025-05-01 14:30
+  ID    Consumer     Provider         Cons Ver  Prov Ver  Status        Environment  Verified At
+  ────  ───────────  ───────────────  ────────  ────────  ────────────  ───────────  ───────────────
+  3081  checkout-ui  payment-service  2.0.0     v2.1.0    COMPATIBLE    production   2026-05-13 14:32
+  3082  mobile-app   payment-service  1.5.0     v2.1.0    INCOMPATIBLE  production   2026-05-13 14:32
 ```
 
 ### BDCT JSON Output
@@ -831,28 +913,60 @@ jobs:
 
 ## Config File
 
-Create `.specshield.yml` in your project root:
+Run [`specshield init`](#specshield-init--first-run-setup-wizard) to generate
+`.specshield.yml` automatically, or hand-write it. Either way, every
+`specshield ...` invocation reads the file from the project root (or any
+parent directory) and uses its values as defaults — CLI flags always win.
+
+The full schema supports both local-compare defaults and BDCT defaults:
 
 ```yaml
+schemaVersion: 1
+
+# Local-compare defaults (used by `specshield compare`).
 failOnBreaking: true
-severity: error
-
+severity: error                  # info | warning | error
 ignore:
-  - "DELETE /admin removed"
+  - "DELETE /admin removed"      # match by substring; repeatable
 
+# Hosted compare (set --remote on the CLI to override).
 remote:
   enabled: false
-  url: "https://specshield.io/compare"
+  url: https://specshield.io/compare
   timeout: 10000
-  # apiKey: ""  ← use env var instead
+  # apiKey is intentionally NOT set here. Use SPECSHIELD_API_KEY in CI
+  # or `specshield login` locally. Never commit a key to a file.
 
+# BDCT defaults (used by every `specshield bdct ...` subcommand).
+bdct:
+  org: acme-pay
+  environment: staging
+  # server: https://specshield.io   # only set for self-hosted / staging
+
+  provider:
+    name: payment-service
+    spec: api/openapi.yaml          # paths are relative to this file
+    # branch: main                  # informational tag on each publish
+
+  # consumer:
+  #   name: checkout-ui
+  #   provider: payment-service
+  #   contract: contracts/payment-service.yaml
+  #   format: OPENAPI               # OPENAPI | PACT
+
+# GitHub App + bdct-action defaults.
 github:
   specPath: api/openapi.yaml
   failOnBreaking: true
   commentOnPr: true
 ```
 
-CLI flags always override config file values.
+When this file is present, BDCT commands collapse to just `--version`:
+
+```bash
+specshield bdct publish-provider --version $GITHUB_SHA
+specshield bdct can-i-deploy     --version $GITHUB_SHA
+```
 
 ---
 
@@ -885,12 +999,32 @@ specshield bdct <subcommand> [options]
 | `publish-consumer` | Publish a consumer contract (OpenAPI subset or Pact JSON) |
 | `verify` | Manually trigger verification for a consumer/provider pair |
 | `can-i-deploy` | Check if a service version is safe to deploy |
-| `matrix` | View compatibility matrix across all pairs |
+| `matrix` | Compatibility matrix across all consumer/provider pairs |
 | `list-providers` | List published provider specs |
 | `list-consumers` | List published consumer contracts |
 | `list` | List verification history |
 
-All `bdct` subcommands support `--json` for machine-readable output.
+Every `bdct` subcommand accepts these flags in common:
+
+| Flag | Purpose |
+|---|---|
+| `--org <key>` | Organization key (or read from `.specshield.yml`'s `bdct.org`) |
+| `--json` | Machine-readable JSON output |
+| `--server <url>` | Override SpecShield server URL (self-hosted / staging) |
+| `--api-token <token>` | API token (overrides env / stored config) |
+
+Per-subcommand flags:
+
+| Subcommand | Flags |
+|---|---|
+| `publish-provider` | `--spec <path>`, `--provider <name>`, `--version <ver>`, `--env <env>`, `--branch <branch>` |
+| `publish-consumer` | `--contract <path>`, `--consumer <name>`, `--provider <name>`, `--version <ver>`, `--format OPENAPI\|PACT` |
+| `verify` | `--consumer <name>`, `--provider <name>`, `--consumer-version <ver>`, `--provider-version <ver>`, `--env <env>` |
+| `can-i-deploy` | `--service <name>`, `--version <ver>`, `--env <env>` |
+| `matrix` | `--env <env>` |
+| `list-providers` | `--provider <name>` (filter) |
+| `list-consumers` | `--consumer <name>` (filter), `--provider <name>` (filter) |
+| `list` | `--consumer <name>`, `--provider <name>`, `--env <env>`, `--page <n>`, `--size <n>` |
 
 ---
 
