@@ -137,6 +137,15 @@ specshield bdct can-i-deploy --version $GITHUB_SHA
 
 See [§ specshield init](#specshield-init--first-run-setup-wizard) below.
 
+> **Quiet install for CI / Docker images:**
+> The post-install welcome banner auto-detects CI environments (`CI`,
+> `GITHUB_ACTIONS`, `BUILDKITE`, `CIRCLECI`, `GITLAB_CI`, `JENKINS_URL`,
+> `TRAVIS`, `TF_BUILD`) and skips itself there — so your CI logs stay clean.
+> To silence it on a workstation too:
+> ```bash
+> export SPECSHIELD_NO_BANNER=1
+> ```
+
 ---
 
 ## 🚀 Create Your Free Account
@@ -160,7 +169,9 @@ See [§ specshield init](#specshield-init--first-run-setup-wizard) below.
 | Breaking change detection | ✅ | ✅ | ✅ |
 | JSON / human output | ✅ | ✅ | ✅ |
 | Fail CI on breaking change | ✅ | ✅ | ✅ |
-| **Compare history & dashboard** | ❌ | ✅ | ✅ |
+| **`specshield history` — compare timeline** | ❌ | ✅ | ✅ |
+| **`specshield share` — public report URLs** | ❌ | ✅ | ✅ |
+| **Dashboard** | ❌ | ✅ | ✅ |
 | **GitHub App PR checks** | ❌ | ✅ | ✅ |
 | **BDCT bi-directional contracts** | ❌ | ❌ | ✅ |
 | **BDCT can-i-deploy gating** | ❌ | ❌ | ✅ |
@@ -319,6 +330,63 @@ specshield compare base.yaml target.yaml --remote --fail-on-breaking
 # Remote + JSON output saved to file
 specshield compare base.yaml target.yaml --remote --json --output result.json
 ```
+
+---
+
+## Comparison History
+
+Every `specshield compare --remote` is saved to your SpecShield account.
+List the recent comparisons your account has run from any machine — useful
+for tracking API drift over time across CI pipelines + local runs.
+
+```bash
+specshield history                # last 20 comparisons
+specshield history --limit 50     # show more
+specshield history --json         # machine-readable for scripts
+```
+
+```
+  Your recent comparisons
+  ─────────────────────────────────────────────────────
+  482        3 breaking         2026-05-17 14:30   payment-v1.yaml → payment-v2.yaml
+  481        0 breaking         2026-05-17 11:02   user-api.yaml → user-api-updated.yaml
+  480        7 breaking         2026-05-16 18:55   billing-v3.yaml → billing-v4.yaml
+```
+
+Account required — run `specshield login` to set up (free, no credit card).
+
+---
+
+## Share a Comparison
+
+Generate a public, tokenized URL for any comparison report. Anyone with
+the link can view the diff — no SpecShield account needed. Great for
+pasting into Slack threads, PR comments, or Jira tickets.
+
+```bash
+# Share an existing report by ID (from `specshield history`)
+specshield share 482
+
+# Compare two specs and share the result in one step
+specshield share base.yaml target.yaml
+
+# Time-limited link — expires in 30 days
+specshield share 482 --expires 30
+```
+
+```
+  ✔ Share link ready
+  ─────────────────────────────────────────────────────
+    https://specshield.io/r/_Ru8OVubxY3r9zHOsylESaULphCqBYH5jTPYldSMU88
+    Expires:  2026-06-16T12:34:56Z
+
+  Anyone with this link can view the diff — no SpecShield account required.
+```
+
+Links use a 256-bit random token, so they can't be guessed by enumeration.
+Revoke any time from your dashboard at [specshield.io](https://specshield.io).
+
+Account required — `specshield login` to set up.
 
 ---
 
@@ -988,6 +1056,25 @@ specshield compare <base> <target> [options]
 | `--severity <level>` | `info` / `warning` / `error` |
 | `--config <path>` | Path to `.specshield.yml` |
 | `--timeout <ms>` | Request timeout for remote mode |
+
+```bash
+specshield history [options]
+```
+
+| Option | Description |
+|---|---|
+| `--limit <n>` | Number of comparisons to list (default 20) |
+| `--json` | Machine-readable JSON output |
+| `--api-key <key>` | Override stored API key |
+
+```bash
+specshield share <reportId | base.yaml target.yaml> [options]
+```
+
+| Option | Description |
+|---|---|
+| `--expires <days>` | Make the link expire after N days (default: never) |
+| `--api-key <key>` | Override stored API key |
 
 ```bash
 specshield bdct <subcommand> [options]

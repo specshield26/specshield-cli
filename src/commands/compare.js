@@ -12,6 +12,7 @@ const { classifyChanges, filterBySeverity } = require('../core/classifyChanges')
 const { formatHuman, formatJson } = require('../core/outputFormatter');
 const { loadConfig } = require('../core/configLoader');
 const { resolveExitCode } = require('../core/exitCode');
+const { recordCompareAndMaybeRender } = require('../core/conversionPrompt');
 const logger = require('../utils/logger');
 const fsExtra = require('fs-extra');
 const { getStoredApiKey } = require('../config/localConfig');
@@ -91,6 +92,22 @@ compare
           logger.info(`Results saved to ${options.output}`);
         }
       }
+
+      // Contextual signup nudge — runs only when the user isn't logged in,
+      // output is human-readable, not in CI, and they've crossed a usage
+      // threshold this week. The recordCompareAndMaybeRender function is
+      // best-effort; any failure (disk read/write, etc.) is silently
+      // swallowed so the conversion path never blocks compare.
+      try {
+        const loggedIn = !!(options.resolvedApiKey ||
+                            process.env.SPECSHIELD_API_KEY ||
+                            await getStoredApiKey());
+        const prompt = await recordCompareAndMaybeRender({
+          loggedIn,
+          jsonOutput: !!options.json,
+        });
+        if (prompt) process.stdout.write('\n' + prompt + '\n');
+      } catch { /* never block on the nudge */ }
 
       // Exit code
       const code = resolveExitCode(result, options);
