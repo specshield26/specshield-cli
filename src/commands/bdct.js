@@ -6,6 +6,7 @@ const ora = require('ora');
 const path = require('path');
 const fsExtra = require('fs-extra');
 const logger = require('../utils/logger');
+const exitAfterFlush = require('../utils/exitAfterFlush');
 const { getStoredApiKey } = require('../config/localConfig');
 const { applyBdctDefaults } = require('../core/projectConfig');
 const {
@@ -300,7 +301,8 @@ const verifyCommand = new Command('verify')
 
       if (opts.json) {
         process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-        process.exit(success ? 0 : 1);
+        exitAfterFlush(success ? 0 : 1);
+        return;
       }
 
       process.stdout.write('\n');
@@ -352,7 +354,7 @@ const verifyCommand = new Command('verify')
       }
 
       process.stdout.write('\n');
-      process.exit(success ? 0 : 1);
+      exitAfterFlush(success ? 0 : 1);
     } catch (err) {
       if (spinner) spinner.fail('Verification failed');
       logger.error(err.message);
@@ -399,7 +401,8 @@ const canIDeployCommand = new Command('can-i-deploy')
 
       if (opts.json) {
         process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-        process.exit(deployable ? 0 : 1);
+        exitAfterFlush(deployable ? 0 : 1);
+        return;
       }
 
       // Idempotent `v` prefix on display — don't double it when the stored
@@ -433,10 +436,10 @@ const canIDeployCommand = new Command('can-i-deploy')
         process.stdout.write(chalk.gray(`  ➜  Run: specshield bdct verify --consumer <NAME> --provider ${opts.service}\n`));
         process.stdout.write(chalk.gray(`  ➜  to identify and resolve incompatibilities\n`));
         process.stdout.write('\n');
-        process.exit(1);
+        exitAfterFlush(1);
       } else {
         process.stdout.write('\n');
-        process.exit(0);
+        exitAfterFlush(0);
       }
     } catch (err) {
       if (spinner) spinner.fail('Check failed');
@@ -817,7 +820,8 @@ const verifyProviderCommand = new Command('verify-provider')
 
     if (opts.json) {
       process.stdout.write(JSON.stringify(report, null, 2) + '\n');
-      process.exit(report.summary.fail + report.summary.error > 0 ? 1 : 0);
+      exitAfterFlush(report.summary.fail + report.summary.error > 0 ? 1 : 0);
+      return;
     }
 
     // Human report.
@@ -850,7 +854,7 @@ const verifyProviderCommand = new Command('verify-provider')
     const s = report.summary;
     process.stdout.write('  ' + '─'.repeat(60) + '\n');
     process.stdout.write(`  ${s.pass} pass · ${s.fail} fail · ${s.error} error · ${s.skipped} skip   (${s.total} probes)\n\n`);
-    process.exit(s.fail + s.error > 0 ? 1 : 0);
+    exitAfterFlush(s.fail + s.error > 0 ? 1 : 0);
   });
 
 // Repeatable --header parser: collects into a map.

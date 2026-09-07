@@ -5,6 +5,7 @@ const chalk = require('chalk');
 const ora = require('ora');
 const fsExtra = require('fs-extra');
 const logger = require('../utils/logger');
+const exitAfterFlush = require('../utils/exitAfterFlush');
 const { loadSpec } = require('../core/loadSpec');
 const { getStoredApiKey } = require('../config/localConfig');
 const { governanceGate } = require('../api/bdctClient');
@@ -80,8 +81,8 @@ const govern = new Command('govern')
         if (opts.output) await fsExtra.outputFile(opts.output, JSON.stringify(resp, null, 2));
       }
 
-      if (opts.advisory) process.exit(0);
-      process.exit(resp.passed ? 0 : 1);
+      if (opts.advisory) exitAfterFlush(0);
+      else exitAfterFlush(resp.passed ? 0 : 1);
     } catch (err) {
       if (err.status === 402) {
         logger.error('API governance requires a paid plan (Team or above). See https://specshield.io/pricing');

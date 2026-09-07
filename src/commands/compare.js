@@ -14,6 +14,7 @@ const { loadConfig } = require('../core/configLoader');
 const { resolveExitCode } = require('../core/exitCode');
 const { recordCompareAndMaybeRender } = require('../core/conversionPrompt');
 const logger = require('../utils/logger');
+const exitAfterFlush = require('../utils/exitAfterFlush');
 const fsExtra = require('fs-extra');
 const { getStoredApiKey } = require('../config/localConfig');
 
@@ -129,7 +130,7 @@ compare
 
       // Exit code
       const code = resolveExitCode(result, options);
-      process.exit(code);
+      exitAfterFlush(code);
 
     } catch (err) {
       logger.error(`Error: ${err.message}`);
